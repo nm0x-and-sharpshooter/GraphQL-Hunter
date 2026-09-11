@@ -1,1 +1,42 @@
-#nikil
+{
+  "manifest_version": 2,
+  "name": "GraphQL Hunter",
+  "version": "0.1.0",
+  "description": "Security-testing extension for GraphQL API auditing, BOLA detection, and attack-surface mapping.",
+
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "storage",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "scripts": ["background/background.js"],
+    "persistent": true
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content.js"],
+      "run_at": "document_start"
+    }
+  ],
+
+  "web_accessible_resources": [
+    "content/page-hook.js"
+  ],
+
+  "browser_action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "GraphQL Hunter"
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "graphql-hunter@security.tools",
+      "strict_min_version": "109.0"
+    }
+  }
+}

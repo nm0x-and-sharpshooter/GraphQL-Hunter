@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GraphQL Hunter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="shell">
+
+    <!-- ── Header ─────────────────────────────────────────────────────── -->
+    <header class="header">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M12 2v20M3 7l9 5 9-5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-name">GraphQL Hunter</span>
+        <span class="version-badge">v0.1</span>
+      </div>
+      <div class="status-pill" id="status-pill">
+        <span class="status-dot" id="status-dot"></span>
+        <span class="status-label" id="status-label">Hunting</span>
+      </div>
+    </header>
+
+    <!-- ── Stats row ──────────────────────────────────────────────────── -->
+    <section class="stats-row" aria-label="Request statistics">
+      <div class="stat-card">
+        <span class="stat-num" id="stat-total">0</span>
+        <span class="stat-desc">Captured</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-card">
+        <span class="stat-num" id="stat-endpoints">0</span>
+        <span class="stat-desc">Endpoints</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-card accent-mutation">
+        <span class="stat-num" id="stat-mutations">0</span>
+        <span class="stat-desc">Mutations</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-card accent-batch">
+        <span class="stat-num" id="stat-batch">0</span>
+        <span class="stat-desc">Batched</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-card accent-risk">
+        <span class="stat-num" id="stat-risks">0</span>
+        <span class="stat-desc">Risks</span>
+      </div>
+    </section>
+
+    <!-- ── Recent captures ────────────────────────────────────────────── -->
+    <section class="feed-section">
+      <div class="feed-header">
+        <span class="feed-title">Recent Traffic</span>
+        <button class="btn-ghost" id="btn-clear" title="Clear all captured data">Clear</button>
+      </div>
+
+      <div class="feed" id="feed" role="list">
+        <!-- Populated by popup.ts -->
+        <div class="empty-state" id="empty-state">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/>
+            <path d="M24 4L12 14.5 6.5 27.5l5 10.5H36.5l5-10.5L36 14.5 24 4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M24 4v40M6.5 27.5h35M12 14.5l12 13 12-13M17 38l7-10.5 7 10.5" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+          </svg>
+          <p>Browse a GraphQL-powered app<br/>to start intercepting traffic</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ─────────────────────────────────────────────────────── -->
+    <footer class="footer">
+      <button class="btn-primary" id="btn-dashboard">
+        Open Full Dashboard
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </footer>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

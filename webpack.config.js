@@ -37,6 +37,12 @@ module.exports = (env, argv) => {
       alias: {
         '@': path.resolve(__dirname, 'extension'),
       },
+      // Don't bundle node built-ins
+      fallback: {
+        path:   false,
+        fs:     false,
+        crypto: false,
+      },
     },
     plugins: [
       new CopyPlugin({
@@ -58,15 +64,6 @@ module.exports = (env, argv) => {
     devtool: isDev ? 'inline-source-map' : false,
     optimization: {
       minimize: !isDev,
-    },
-    // Don't bundle node built-ins
-    resolve: {
-      extensions: ['.tsx', '.ts', '.js'],
-      fallback: {
-        path:   false,
-        fs:     false,
-        crypto: false,
-      },
     },
   };
 };

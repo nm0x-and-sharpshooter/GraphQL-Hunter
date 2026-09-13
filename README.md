@@ -177,30 +177,13 @@ $$\text{Estimated Cost} = \sum (\text{Field Depth} \times \text{List Multiplier}
 
 ## 🖥️ Extension HUD (Popup Interface)
 
-The extension popup features a sleek, dark terminal aesthetic built for rapid situational awareness:
+The extension popup provides a dark, high-contrast tactical HUD designed for real-time situational awareness:
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ ⬡ GraphQL Hunter  v0.1                     ● Hunting       │
-├─────────────────────────────────────────────────────────────┤
-│   142       4          18          12           7           │
-│ CAPTURED ENDPOINTS  MUTATIONS   BATCHED      RISKS          │
-├─────────────────────────────────────────────────────────────┤
-│  [ ≡ Traffic ]          [ ⊞ Schema  (24) ]                  │
-├─────────────────────────────────────────────────────────────┤
-│  MUT  updateUserAccount                d3  [ CRITICAL ] 200 │
-│       3 fields · /api/v2/graphql                      84ms  │
-│                                                             │
-│  QRY  getUserInvoices                  d6  [ HIGH ]     200 │
-│       14 fields · /api/v2/graphql                    142ms  │
-│                                                             │
-│  B2   Batch (2 Operations)                 [ MEDIUM ]   200 │
-│       8 fields · /graphql                             61ms  │
-│                                                             │
-│  QRY  getPublicFeed                    d2  [ LOW ]      200 │
-│       24 fields · /graphql                            39ms  │
-└─────────────────────────────────────────────────────────────┘
-```
+<div align="center">
+  <img src="assets/popup-preview.png" alt="GraphQL Hunter Tactical Popup HUD" width="420" style="border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.6);" />
+  <br/>
+  <sub><em>Live traffic interception with AST depth scoring (e.g. <code>d3</code>), instant heuristic risk grading (<code>HIGH</code>), aggregate metric telemetry, and zero-introspection schema status.</em></sub>
+</div>
 
 ---
 

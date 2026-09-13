@@ -10,20 +10,36 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import type { CapturedRequest, GraphQLRequestBody, HunterStats } from '../types/graphql';
+import type { CapturedRequest, GraphQLRequestBody, HunterStats, SchemaModel } from '../types/graphql';
 import type { HunterMessage } from '../types/messages';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
-const elTotal     = document.getElementById('stat-total')!;
-const elEndpoints = document.getElementById('stat-endpoints')!;
-const elMutations = document.getElementById('stat-mutations')!;
-const elBatch     = document.getElementById('stat-batch')!;
-const elRisks     = document.getElementById('stat-risks')!;
-const elFeed      = document.getElementById('feed')!;
-const elEmpty     = document.getElementById('empty-state')!;
-const btnClear    = document.getElementById('btn-clear')!;
-const btnDash     = document.getElementById('btn-dashboard')!;
+const elTotal         = document.getElementById('stat-total')!;
+const elEndpoints     = document.getElementById('stat-endpoints')!;
+const elMutations     = document.getElementById('stat-mutations')!;
+const elBatch         = document.getElementById('stat-batch')!;
+const elRisks         = document.getElementById('stat-risks')!;
+const elFeed          = document.getElementById('feed')!;
+const elEmpty         = document.getElementById('empty-state')!;
+const btnClear        = document.getElementById('btn-clear')!;
+const btnDash         = document.getElementById('btn-dashboard')!;
+
+// ── Day 3: Tab + Schema DOM refs ──────────────────────────────────────────────
+const btnTabTraffic   = document.getElementById('tab-traffic')!;
+const btnTabSchema    = document.getElementById('tab-schema')!;
+const panelTraffic    = document.getElementById('panel-traffic')!;
+const panelSchema     = document.getElementById('panel-schema')!;
+const elSchemaEmpty   = document.getElementById('schema-empty')!;
+const elSchemaStats   = document.getElementById('schema-stats')!;
+const elSchemaTree    = document.getElementById('schema-tree')!;
+const elSchemaEps     = document.getElementById('schema-endpoints')!;
+const elEndpointList  = document.getElementById('endpoint-list')!;
+const elSchemaStatTypes    = document.getElementById('schema-stat-types')!;
+const elSchemaStatFields   = document.getElementById('schema-stat-fields')!;
+const elSchemaStatEndpoints = document.getElementById('schema-stat-endpoints')!;
+const elSchemaTypeCount    = document.getElementById('schema-type-count')!;
+const btnClearSchema  = document.getElementById('btn-clear-schema')!;;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -119,6 +135,12 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
     ? `<span class="item-field-count">${totalFields} ${totalFields === 1 ? 'field' : 'fields'}</span><span class="item-meta-divider">·</span>`
     : '';
 
+  // Day 3: Complexity badge
+  const complexity       = primaryOp?.complexity;
+  const complexityHtml   = complexity && complexity.depth > 2
+    ? `<span class="complexity-badge ${complexity.isHighComplexity ? 'high' : ''}" title="Depth: ${complexity.depth} | Cost: ${complexity.estimatedCost}">d${complexity.depth}</span>`
+    : '';
+
   const item     = document.createElement('div');
   item.className = 'feed-item';
   item.setAttribute('role', 'listitem');
@@ -131,6 +153,7 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
         <span class="item-url">${escapeHtml(fmtUrl(req.url))}</span>
       </div>
     </div>
+    ${complexityHtml}
     ${riskBadgeHtml}
     <span class="item-status ${statusClass}">${statusText}</span>
     <span class="item-duration">${duration != null ? fmtMs(duration) : ''}</span>
@@ -166,15 +189,105 @@ function renderStats(stats: HunterStats): void {
   }
 }
 
+// ── Day 3: Schema rendering ───────────────────────────────────────────────────
+
+function renderSchema(model: SchemaModel): void {
+  const typeNames  = Object.keys(model.types);
+  const totalTypes = typeNames.length;
+  const totalFields = typeNames.reduce(
+    (n, t) => n + Object.keys(model.types[t].fields).length, 0,
+  );
+
+  // Update tab badge
+  elSchemaTypeCount.textContent = String(totalTypes);
+
+  if (totalTypes === 0) {
+    elSchemaEmpty.style.display  = '';
+    elSchemaStats.style.display  = 'none';
+    elSchemaTree.innerHTML       = '';
+    elSchemaEps.style.display    = 'none';
+    return;
+  }
+
+  // Stats bar
+  elSchemaEmpty.style.display       = 'none';
+  elSchemaStats.style.display       = '';
+  elSchemaStatTypes.textContent     = String(totalTypes);
+  elSchemaStatFields.textContent    = String(totalFields);
+  elSchemaStatEndpoints.textContent = String(model.endpoints.length);
+
+  // Type tree
+  elSchemaTree.innerHTML = '';
+  for (const typeName of typeNames.sort()) {
+    const schemaType = model.types[typeName];
+    const fieldNames = Object.keys(schemaType.fields);
+
+    const node = document.createElement('div');
+    node.className = 'schema-type-node';
+
+    node.innerHTML = `
+      <div class="schema-type-header" role="button" tabindex="0" aria-expanded="false">
+        <svg class="schema-chevron" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="schema-type-name">${escapeHtml(typeName)}</span>
+        <span class="schema-type-count">${fieldNames.length} ${fieldNames.length === 1 ? 'field' : 'fields'}</span>
+      </div>
+      <div class="schema-field-list" role="list">
+        ${fieldNames.sort().map(fn => {
+          const f = schemaType.fields[fn];
+          const argsText = f.args.length > 0 ? `(${f.args.join(', ')})` : '';
+          const opPills  = f.seenInOps
+            .map(op => `<span class="schema-op-pill ${op}">${op === 'subscription' ? 'sub' : op}</span>`)
+            .join('');
+          return `
+            <div class="schema-field-row" role="listitem">
+              <span class="schema-field-name">${escapeHtml(fn)}</span>
+              ${argsText ? `<span class="schema-field-args">${escapeHtml(argsText)}</span>` : ''}
+              <span class="schema-field-ops">${opPills}</span>
+              <span class="schema-field-count" title="${f.observationCount} observations">×${f.observationCount}</span>
+            </div>`;
+        }).join('')}
+      </div>
+    `;
+
+    // Toggle open/close on header click
+    const header = node.querySelector('.schema-type-header')!;
+    header.addEventListener('click', () => {
+      node.classList.toggle('open');
+      header.setAttribute('aria-expanded', String(node.classList.contains('open')));
+    });
+    header.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
+        (header as HTMLElement).click();
+      }
+    });
+
+    elSchemaTree.appendChild(node);
+  }
+
+  // Endpoints
+  if (model.endpoints.length > 0) {
+    elSchemaEps.style.display = '';
+    elEndpointList.innerHTML  = model.endpoints
+      .map(ep => `<li class="endpoint-item">${escapeHtml(ep)}</li>`)
+      .join('');
+  } else {
+    elSchemaEps.style.display = 'none';
+  }
+}
+
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 async function refresh(): Promise<void> {
-  const [requests, stats] = await Promise.all([
+  const [requests, stats, schema] = await Promise.all([
     browser.runtime.sendMessage({ type: 'GET_CAPTURED_REQUESTS' }) as Promise<CapturedRequest[]>,
     browser.runtime.sendMessage({ type: 'GET_STATS' })              as Promise<HunterStats>,
+    browser.runtime.sendMessage({ type: 'GET_SCHEMA' })             as Promise<SchemaModel>,
   ]);
-  renderFeed(requests  ?? []);
-  renderStats(stats    ?? { totalRequests: 0, endpoints: [], batchCount: 0, mutationCount: 0, queryCount: 0, riskCount: 0 });
+  renderFeed(requests   ?? []);
+  renderStats(stats     ?? { totalRequests: 0, endpoints: [], batchCount: 0, mutationCount: 0, queryCount: 0, riskCount: 0 });
+  renderSchema(schema   ?? { types: {}, endpoints: [], lastUpdated: 0 });
 }
 
 // ── Live updates from background ──────────────────────────────────────────────
@@ -193,6 +306,26 @@ btnClear.addEventListener('click', async () => {
   await browser.runtime.sendMessage({ type: 'CLEAR_REQUESTS' });
   await refresh();
 });
+
+// Day 3: Schema clear
+btnClearSchema.addEventListener('click', async () => {
+  await browser.runtime.sendMessage({ type: 'CLEAR_SCHEMA' });
+  await refresh();
+});
+
+// Day 3: Tab switching
+function switchTab(target: 'traffic' | 'schema'): void {
+  const isTraffic = target === 'traffic';
+  btnTabTraffic.classList.toggle('active', isTraffic);
+  btnTabTraffic.setAttribute('aria-selected', String(isTraffic));
+  btnTabSchema.classList.toggle('active', !isTraffic);
+  btnTabSchema.setAttribute('aria-selected', String(!isTraffic));
+  panelTraffic.classList.toggle('hidden', !isTraffic);
+  panelSchema.classList.toggle('hidden', isTraffic);
+}
+
+btnTabTraffic.addEventListener('click', () => switchTab('traffic'));
+btnTabSchema.addEventListener('click',  () => switchTab('schema'));
 
 btnDash.addEventListener('click', () => {
   // Day 9-10: open full dashboard tab

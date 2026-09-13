@@ -56,8 +56,29 @@
       </div>
     </section>
 
-    <!-- ── Recent captures ────────────────────────────────────────────── -->
-    <section class="feed-section">
+    <!-- ── Tab bar ──────────────────────────────────────────────────────── -->
+    <nav class="tab-bar" role="tablist" aria-label="Views">
+      <button class="tab-btn active" id="tab-traffic" role="tab"
+              aria-selected="true" aria-controls="panel-traffic">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Traffic
+      </button>
+      <button class="tab-btn" id="tab-schema" role="tab"
+              aria-selected="false" aria-controls="panel-schema">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M4.5 7v2h7V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Schema
+        <span class="tab-badge" id="schema-type-count">0</span>
+      </button>
+    </nav>
+
+    <!-- ── Traffic panel ─────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="panel-traffic" role="tabpanel" aria-labelledby="tab-traffic">
       <div class="feed-header">
         <span class="feed-title">Recent Traffic</span>
         <button class="btn-ghost" id="btn-clear" title="Clear all captured data">Clear</button>
@@ -73,6 +94,42 @@
           </svg>
           <p>Browse a GraphQL-powered app<br/>to start intercepting traffic</p>
         </div>
+      </div>
+    </section>
+
+    <!-- ── Schema panel ───────────────────────────────────────────────────── -->
+    <section class="tab-panel hidden" id="panel-schema" role="tabpanel" aria-labelledby="tab-schema">
+      <div class="feed-header">
+        <span class="feed-title">Discovered Schema</span>
+        <button class="btn-ghost" id="btn-clear-schema" title="Clear schema model">Clear</button>
+      </div>
+
+      <!-- Schema empty state -->
+      <div class="empty-state" id="schema-empty">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="4" y="4" width="14" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+          <rect x="30" y="30" width="14" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M11 18v6h26v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>Schema will be reconstructed<br/>as you capture GraphQL traffic</p>
+      </div>
+
+      <!-- Schema stats bar -->
+      <div class="schema-stats" id="schema-stats" style="display:none">
+        <span class="schema-stat"><strong id="schema-stat-types">0</strong> types</span>
+        <span class="schema-stat-divider">·</span>
+        <span class="schema-stat"><strong id="schema-stat-fields">0</strong> fields</span>
+        <span class="schema-stat-divider">·</span>
+        <span class="schema-stat"><strong id="schema-stat-endpoints">0</strong> endpoints</span>
+      </div>
+
+      <!-- Type tree (populated by popup.ts) -->
+      <div class="schema-tree" id="schema-tree" aria-label="Discovered types"></div>
+
+      <!-- Endpoint list -->
+      <div class="schema-endpoints" id="schema-endpoints" style="display:none">
+        <div class="schema-section-title">Observed Endpoints</div>
+        <ul class="endpoint-list" id="endpoint-list" aria-label="GraphQL endpoints"></ul>
       </div>
     </section>
 

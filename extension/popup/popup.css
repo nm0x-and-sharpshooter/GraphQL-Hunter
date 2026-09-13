@@ -445,3 +445,252 @@ body {
   border-top:    1px solid var(--border-subtle);
   background:    var(--bg-surface);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Day 3 — Tab bar, Schema panel, Complexity badge
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Utility ─────────────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+.tab-bar {
+  display:       flex;
+  gap:           2px;
+  padding:       6px 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background:    var(--bg-surface);
+}
+
+.tab-btn {
+  display:        flex;
+  align-items:    center;
+  gap:            6px;
+  padding:        7px 12px;
+  border:         none;
+  border-bottom:  2px solid transparent;
+  background:     transparent;
+  color:          var(--text-muted);
+  font-size:      12px;
+  font-weight:    500;
+  font-family:    inherit;
+  cursor:         pointer;
+  border-radius:  6px 6px 0 0;
+  transition:     color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.tab-btn svg {
+  width:  13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.tab-btn:hover {
+  color:      var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tab-btn.active {
+  color:        var(--accent-violet);
+  border-bottom-color: var(--accent-violet);
+}
+
+.tab-badge {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  min-width:       18px;
+  height:          16px;
+  padding:         0 5px;
+  background:      rgba(139, 92, 246, 0.2);
+  color:           var(--accent-violet);
+  border-radius:   8px;
+  font-size:       10px;
+  font-weight:     600;
+}
+
+/* ── Tab panels ──────────────────────────────────────────────────────────── */
+.tab-panel {
+  display:        flex;
+  flex-direction: column;
+  flex:           1;
+  overflow:       hidden;
+}
+
+/* ── Schema stats bar ────────────────────────────────────────────────────── */
+.schema-stats {
+  display:       flex;
+  align-items:   center;
+  gap:           8px;
+  padding:       8px 16px;
+  font-size:     11px;
+  color:         var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.schema-stats strong {
+  color:       var(--text-primary);
+  font-weight: 600;
+}
+
+.schema-stat-divider { color: var(--border-subtle); }
+
+/* ── Schema tree ─────────────────────────────────────────────────────────── */
+.schema-tree {
+  overflow-y: auto;
+  flex:       1;
+  padding:    8px 8px 4px;
+}
+
+.schema-type-node {
+  margin-bottom: 4px;
+  border:        1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow:      hidden;
+}
+
+.schema-type-header {
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+  padding:     7px 10px;
+  background:  rgba(255,255,255,0.03);
+  cursor:      pointer;
+  user-select: none;
+  transition:  background 0.1s ease;
+}
+
+.schema-type-header:hover { background: rgba(255,255,255,0.06); }
+
+.schema-type-name {
+  font-size:   12px;
+  font-weight: 600;
+  color:       var(--accent-violet);
+  font-family: 'JetBrains Mono', monospace;
+  flex:        1;
+}
+
+.schema-type-count {
+  font-size: 10px;
+  color:     var(--text-muted);
+}
+
+.schema-chevron {
+  width:       12px;
+  height:      12px;
+  color:       var(--text-muted);
+  transition:  transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.schema-type-node.open .schema-chevron { transform: rotate(90deg); }
+
+.schema-field-list {
+  display:    none;
+  padding:    4px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.schema-type-node.open .schema-field-list { display: block; }
+
+.schema-field-row {
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+  padding:     4px 14px;
+  font-size:   11px;
+  transition:  background 0.1s ease;
+}
+
+.schema-field-row:hover { background: rgba(255,255,255,0.03); }
+
+.schema-field-name {
+  font-family: 'JetBrains Mono', monospace;
+  color:       var(--text-primary);
+  flex:        1;
+}
+
+.schema-field-args {
+  font-size:   10px;
+  color:       var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.schema-field-ops { display: flex; gap: 3px; }
+
+.schema-op-pill {
+  font-size:      9px;
+  font-weight:    600;
+  padding:        1px 5px;
+  border-radius:  4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.schema-op-pill.query        { background: rgba(16,185,129,0.15); color: var(--accent-green);  }
+.schema-op-pill.mutation     { background: rgba(239,68,68,0.15);  color: var(--accent-red);    }
+.schema-op-pill.subscription { background: rgba(234,179,8,0.15);  color: var(--accent-yellow); }
+
+.schema-field-count {
+  font-size:  10px;
+  color:      var(--text-muted);
+  min-width:  20px;
+  text-align: right;
+}
+
+/* ── Schema endpoints ────────────────────────────────────────────────────── */
+.schema-section-title {
+  font-size:      10px;
+  font-weight:    600;
+  color:          var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding:        8px 14px 4px;
+}
+
+.endpoint-list {
+  list-style: none;
+  margin:     0;
+  padding:    0 10px 8px;
+}
+
+.endpoint-item {
+  display:      flex;
+  align-items:  center;
+  gap:          6px;
+  padding:      5px 6px;
+  font-size:    11px;
+  font-family:  'JetBrains Mono', monospace;
+  color:        var(--text-secondary);
+  border-radius: 6px;
+}
+
+.endpoint-item::before {
+  content:       '';
+  width:         6px;
+  height:        6px;
+  border-radius: 50%;
+  background:    var(--accent-green);
+  flex-shrink:   0;
+}
+
+/* ── Complexity badge (on feed items) ────────────────────────────────────── */
+.complexity-badge {
+  display:     inline-flex;
+  align-items: center;
+  gap:         3px;
+  font-size:   9px;
+  font-weight: 600;
+  padding:     2px 5px;
+  border-radius: 4px;
+  background:  rgba(234,179,8,0.15);
+  color:       var(--accent-yellow);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+
+.complexity-badge.high {
+  background: rgba(239,68,68,0.15);
+  color:      var(--accent-red);
+}
+

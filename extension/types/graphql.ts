@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Core GraphQL domain types for GraphQL Hunter
-// Raw traffic types + Day 2 analysis types all live here to avoid circular
-// module imports between types/graphql.ts ↔ types/analysis.ts.
+// Raw traffic types + Day 2 analysis types + Day 3 schema/complexity types
+// all live here to avoid circular module imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Operation classification ──────────────────────────────────────────────────
@@ -10,7 +10,7 @@ export type OperationType = 'query' | 'mutation' | 'subscription' | 'unknown';
 
 export type RiskLevel = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 
-// ── Day 2: Analysis types ─────────────────────────────────────────────────────
+// ── Day 2 + 3: Analysis types ────────────────────────────────────────────────
 
 /** A single field access extracted from the parsed query AST. */
 export interface FieldAccess {
@@ -36,6 +36,53 @@ export interface QueryAnalysis {
   /** Highest risk level among all findings. */
   riskLevel:     RiskLevel;
   fieldCount:    number;
+  /** Day 3: nesting depth + cost estimate. */
+  complexity?:   ComplexityScore;
+}
+
+// ── Day 3: Complexity score ──────────────────────────────────────────────────
+
+/** Query complexity score derived from depth, field count and list multipliers. */
+export interface ComplexityScore {
+  /** Maximum nesting depth of selection sets. */
+  depth:            number;
+  fieldCount:       number;
+  /** Estimated server-side cost (depth × field count heuristic). */
+  estimatedCost:    number;
+  /** True when cost exceeds the HIGH-risk threshold (depth > 5 or cost > 100). */
+  isHighComplexity: boolean;
+}
+
+// ── Day 3: Schema model ───────────────────────────────────────────────────────
+
+/** A single field observed on a reconstructed schema type. */
+export interface SchemaField {
+  /** Argument names seen on this field across all captures. */
+  args:             string[];
+  /** Operation types in which this field was observed. */
+  seenInOps:        OperationType[];
+  /** How many times this field has been observed. */
+  observationCount: number;
+}
+
+/** A reconstructed type node in the partial schema model. */
+export interface SchemaType {
+  /** Inferred type name (top-level field name used as proxy). */
+  typeName: string;
+  /** Map of fieldName → SchemaField metadata. */
+  fields:   Record<string, SchemaField>;
+}
+
+/**
+ * Incrementally-built partial schema model derived from observed traffic.
+ * No introspection required — reconstructed purely from captured ASTs.
+ */
+export interface SchemaModel {
+  /** Map of rootFieldName → SchemaType. */
+  types:       Record<string, SchemaType>;
+  /** Distinct GraphQL endpoint URLs observed. */
+  endpoints:   string[];
+  lastUpdated: number;
 }
 
 /** Analysis result for a full captured request (single or batched). */
@@ -105,7 +152,7 @@ export interface CapturedRequest {
   isBatch:         boolean;
   /** Populated once the full response body has been captured. */
   response?:   CapturedResponse;
-  /** Populated by the Day 2 query analyzer immediately after capture. */
+  /** Populated by the Day 2/3 query analyzer immediately after capture. */
   analysis?:   RequestAnalysis;
 }
 

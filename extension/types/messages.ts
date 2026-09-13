@@ -6,7 +6,7 @@
 // Using a discriminated union ensures exhaustive handling in every switch.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { CapturedRequest, HunterStats, GraphQLRequestBody } from './graphql';
+import type { CapturedRequest, HunterStats, GraphQLRequestBody, SchemaModel } from './graphql';
 
 // ── Message definitions (discriminated union) ─────────────────────────────────
 
@@ -56,6 +56,22 @@ export interface MsgPageHookRequest {
   payload: PageHookPayload;
 }
 
+/** Popup → background: fetch the current schema model. */
+export interface MsgGetSchema {
+  type: 'GET_SCHEMA';
+}
+
+/** Background → popup: response to GET_SCHEMA. */
+export interface MsgSchemaResponse {
+  type:    'SCHEMA_RESPONSE';
+  payload: SchemaModel;
+}
+
+/** Popup → background: wipe the schema model. */
+export interface MsgClearSchema {
+  type: 'CLEAR_SCHEMA';
+}
+
 // ── Union type ────────────────────────────────────────────────────────────────
 
 export type HunterMessage =
@@ -65,6 +81,9 @@ export type HunterMessage =
   | MsgClearRequests
   | MsgGetStats
   | MsgStatsResponse
-  | MsgPageHookRequest;
+  | MsgPageHookRequest
+  | MsgGetSchema
+  | MsgSchemaResponse
+  | MsgClearSchema;
 
 export type MessageType = HunterMessage['type'];

@@ -11,6 +11,7 @@ import type {
   FieldAccess,
   GraphQLRequestBody,
   OperationType,
+  ComplexityScore,
 } from '../types/graphql';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -21,6 +22,8 @@ export interface ScoreInput {
   fields:        FieldAccess[];
   variables:     string[];
   body:          GraphQLRequestBody;
+  /** Day 3: optional complexity score from complexity-scorer.ts */
+  complexity?:   ComplexityScore;
 }
 
 // ── Patterns ──────────────────────────────────────────────────────────────────
@@ -89,6 +92,27 @@ export function scoreQuery(input: ScoreInput): RiskFinding[] {
       title:  'Excessive Field Count',
       detail: `${fields.length} fields selected — potential data over-exposure or DoS amplification.`,
     });
+  }
+
+  // ── Day 3: Complexity findings ────────────────────────────────────────────
+  if (input.complexity) {
+    const { depth, estimatedCost } = input.complexity;
+
+    if (depth > 5) {
+      findings.push({
+        level:  'HIGH',
+        title:  'Deep Query Nesting',
+        detail: `Nesting depth ${depth} — deeply nested queries can cause exponential server-side resolver work (DoS amplification).`,
+      });
+    }
+
+    if (estimatedCost > 100) {
+      findings.push({
+        level:  'MEDIUM',
+        title:  'High Query Complexity',
+        detail: `Estimated cost ${estimatedCost} — complex queries bypass simple rate-limits; server may lack query depth/cost guards.`,
+      });
+    }
   }
 
   // ── INFO: Anonymous operation ─────────────────────────────────────────────

@@ -3,7 +3,7 @@
 //
 // Parses captured query strings into ASTs using the official `graphql` parser,
 // extracts accessed fields, arguments, variables, and operation metadata,
-// and invokes the risk scorer to assign security risk levels.
+// and invokes the risk scorer + complexity scorer to assign security risk levels.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -24,6 +24,7 @@ import type {
   OperationType,
 } from '../types/graphql';
 import { scoreQuery, highestRisk } from './risk-scorer';
+import { scoreComplexity }        from './complexity-scorer';
 
 const ID_ARG_REGEX = /^(id|.*Id|.*_id|uuid|guid|key|pk|nodeId)$/i;
 
@@ -108,12 +109,15 @@ function analyzeOperation(
     },
   });
 
+  const complexity = scoreComplexity(op);
+
   const findings = scoreQuery({
     operationType: opType,
     operationName: opName,
     fields,
     variables,
     body,
+    complexity,
   });
 
   const riskLevel = highestRisk(findings.map(f => f.level));
@@ -126,6 +130,7 @@ function analyzeOperation(
     findings,
     riskLevel,
     fieldCount: fields.length,
+    complexity,
   };
 }
 

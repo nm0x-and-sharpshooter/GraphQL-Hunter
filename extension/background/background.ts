@@ -11,8 +11,9 @@
 
 import { startObserving, onRequestCaptured } from './request-observer';
 import { startMessageRouter, broadcast, onPageHookCaptured } from './message-router';
-import { saveRequest } from './storage';
+import { saveRequest, getSchema, updateSchema } from './storage';
 import { analyzeRequest } from '../analysis/query-analyzer';
+import { mergeRequestIntoSchema } from '../analysis/schema-builder';
 import type { CapturedRequest, GraphQLRequestBody } from '../types/graphql';
 import type { PageHookPayload } from '../types/messages';
 
@@ -24,6 +25,15 @@ console.log('[GraphQL Hunter] Background script initialising…');
 async function processCapturedRequest(request: CapturedRequest, source: string): Promise<void> {
   // Day 2: Run AST-based query analyzer and heuristic risk scorer
   request.analysis = analyzeRequest(request);
+
+  // Day 3: Incrementally update the persisted schema model
+  try {
+    const schema = await getSchema();
+    mergeRequestIntoSchema(schema, request);
+    await updateSchema(schema);
+  } catch (err) {
+    console.warn('[GraphQL Hunter] Schema update failed:', err);
+  }
 
   const ops = Array.isArray(request.body) ? request.body : [request.body];
   const opNames = ops

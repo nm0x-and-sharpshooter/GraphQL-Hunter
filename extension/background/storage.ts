@@ -6,10 +6,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import type { CapturedRequest, HunterStats } from '../types/graphql';
+import type { CapturedRequest, HunterStats, SchemaModel } from '../types/graphql';
+import { emptySchemaModel } from '../analysis/schema-builder';
 
-const STORAGE_KEY = 'gql_hunter_requests';
-const MAX_STORED = 500;
+const STORAGE_KEY        = 'gql_hunter_requests';
+const SCHEMA_STORAGE_KEY = 'gql_hunter_schema';
+const MAX_STORED         = 500;
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,21 @@ export async function saveRequest(req: CapturedRequest): Promise<void> {
 
 export async function clearRequests(): Promise<void> {
   await browser.storage.local.remove(STORAGE_KEY);
+}
+
+// ── Schema persistence (Day 3) ────────────────────────────────────────────────
+
+export async function getSchema(): Promise<SchemaModel> {
+  const result = await browser.storage.local.get(SCHEMA_STORAGE_KEY);
+  return (result[SCHEMA_STORAGE_KEY] as SchemaModel | undefined) ?? emptySchemaModel();
+}
+
+export async function updateSchema(model: SchemaModel): Promise<void> {
+  await browser.storage.local.set({ [SCHEMA_STORAGE_KEY]: model });
+}
+
+export async function clearSchema(): Promise<void> {
+  await browser.storage.local.remove(SCHEMA_STORAGE_KEY);
 }
 
 // ── Aggregate stats ───────────────────────────────────────────────────────────

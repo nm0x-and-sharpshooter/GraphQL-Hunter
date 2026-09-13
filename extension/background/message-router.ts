@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import { getRequests, clearRequests, getStats } from './storage';
+import { getRequests, clearRequests, getStats, getSchema, clearSchema } from './storage';
 import type { HunterMessage, PageHookPayload } from '../types/messages';
 
 export type PageHookHandler = (payload: PageHookPayload, tabId: number) => Promise<void>;
@@ -32,6 +32,12 @@ export function startMessageRouter(): void {
 
         case 'GET_STATS':
           return getStats();
+
+        case 'GET_SCHEMA':
+          return getSchema();
+
+        case 'CLEAR_SCHEMA':
+          return clearSchema().then(() => ({ ok: true }));
 
         case 'PAGE_HOOK_REQUEST':
           if (pageHookHandler) {

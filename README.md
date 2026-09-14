@@ -161,20 +161,6 @@ When introspection queries are blocked by WAFs or server settings, GraphQL Hunte
 
 ---
 
-## 📐 Query Complexity & DoS Cost Engine
-
-GraphQL Hunter calculates the server-side impact of queries before exploitation:
-
-$$\text{Estimated Cost} = \sum (\text{Field Depth} \times \text{List Multiplier})$$
-
-* **Depth Calculation**: Recursively evaluates nested `SelectionSetNode` elements.
-* **List Multiplier ($\times 3$)**: Automatically applied to fields matching list patterns:
-  `/(list|all|search|find|filter|get[A-Z].*s$|.*List$|.*Nodes$|.*Edges$|.*Items$|.*Results$|.*Connection$)/`
-* **Fragment Spreads**: Safely handles inline fragments and assigns weighted baseline costs to named fragments.
-* **Alert Thresholds**: Automatically triggers when `depth > 5` or `cost > 100`.
-
----
-
 ## 🖥️ Extension HUD (Popup Interface)
 
 The extension popup provides a dark, high-contrast tactical HUD designed for real-time situational awareness:
@@ -220,81 +206,6 @@ The compiled, ready-to-load extension will be generated in the `dist/` directory
 2. Click **"Load Temporary Add-on…"**.
 3. Navigate to the project's `dist/` folder and select `manifest.json`.
 4. The **GraphQL Hunter** hex-shield icon will now appear in your browser toolbar!
-
----
-
-## 🛠️ Project Structure
-
-```text
-GraphQL-Hunter/
-├── extension/
-│   ├── manifest.json              # WebExtension Manifest (v2 with Firefox Gecko config)
-│   ├── types/
-│   │   ├── graphql.ts             # Domain models (CapturedRequest, SchemaModel, RiskLevel)
-│   │   └── messages.ts            # Message definitions (Popup <-> Background <-> Content)
-│   ├── background/
-│   │   ├── background.ts          # Core service worker entry point
-│   │   ├── request-observer.ts    # webRequest + filterResponseData StreamFilter engine
-│   │   ├── message-router.ts      # Pub/sub broker for extension messages
-│   │   └── storage.ts             # Session persistence & schema store
-│   ├── content/
-│   │   ├── content.ts             # Isolated content script bridging DOM <-> Background
-│   │   └── page-hook.ts           # Page-world monkey-patch for fetch() & XMLHttpRequest
-│   ├── analysis/
-│   │   ├── query-analyzer.ts      # AST query parser & AST traversal engine
-│   │   ├── risk-scorer.ts         # Heuristic security risk scoring engine
-│   │   ├── complexity-scorer.ts   # Maximum depth & cost estimation (DoS defense)
-│   │   └── schema-builder.ts      # Zero-introspection partial schema reconstructor
-│   └── popup/
-│       ├── popup.html             # HUD shell (Traffic feed, Schema panel, stats bar)
-│       ├── popup.css              # Cyberpunk dark theme styles
-│       └── popup.ts               # UI controller, live event listeners & tree renderer
-├── package.json                   # Dependencies, scripts & build configuration
-├── tsconfig.json                  # Strict TypeScript compiler options
-├── webpack.config.js              # Multi-target Webpack bundler & asset copy pipeline
-└── README.md                      # Project documentation
-```
-
----
-
-## 🗺️ Development Roadmap
-
-GraphQL Hunter is being built through rapid, focused engineering sprints:
-
-- [x] **Day 1: Interception Core**
-  - Firefox `webRequest` API listener with `requestBody` decoding
-  - `filterResponseData()` response body streaming interception
-  - Page-world fetch/XHR hook for client-side queries
-  - Live HUD popup with real-time stats and feed
-- [x] **Day 2: AST Analysis & Risk Engine**
-  - AST parsing via `graphql` library
-  - Field and variable extractor
-  - Heuristic risk scorer (BOLA in mutations, Introspection detection, Over-fetching)
-  - Color-coded risk badges with diagnostic tooltips
-- [x] **Day 3: Schema Reconstruction & Complexity Scorer**
-  - Zero-introspection partial schema reconstruction from live ASTs
-  - Recursive AST query depth and complexity cost calculator
-  - Dual-view tab system in popup (Traffic vs. Schema)
-  - Interactive collapsible schema tree explorer with argument and frequency breakdown
-- [ ] **Day 4: Active BOLA & IDOR Validation**
-  - Automated ID parameter permutation and auth token tampering
-  - Multi-identity replay comparison
-- [ ] **Day 5: Query Batching & Rate-Limit Bypass Fuzzing**
-  - Automated batching attack generation
-  - Aliased query amplification testing
-- [ ] **Day 6: CSRF & CORS Validator**
-  - Content-Type enforcement auditing (`application/json` vs `application/x-www-form-urlencoded`)
-  - Origin reflection checks
-- [ ] **Day 7: Directive Injection & Injection Scanner**
-  - `@skip` / `@include` logic flaw testing
-  - SQLi / NoSQLi payload fuzzing via GraphQL variables
-- [ ] **Day 8: Export & Reporting**
-  - SDL (Schema Definition Language) export
-  - Burp Suite / Postman collection export
-  - Markdown vulnerability report generator
-- [ ] **Day 9–10: Dedicated DevTools & Full-Page Dashboard**
-  - Full-screen offensive security workbench
-  - Interactive GraphQL playground with mutation replayer
 
 ---
 

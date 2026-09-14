@@ -75,6 +75,16 @@
         Schema
         <span class="tab-badge" id="schema-type-count">0</span>
       </button>
+      <button class="tab-btn" id="tab-findings" role="tab"
+              aria-selected="false" aria-controls="panel-findings">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 5v3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="8" cy="11" r="0.75" fill="currentColor"/>
+        </svg>
+        Findings
+        <span class="tab-badge findings-badge" id="findings-count">0</span>
+      </button>
     </nav>
 
     <!-- ── Traffic panel ─────────────────────────────────────────────────── -->
@@ -131,6 +141,27 @@
         <div class="schema-section-title">Observed Endpoints</div>
         <ul class="endpoint-list" id="endpoint-list" aria-label="GraphQL endpoints"></ul>
       </div>
+    </section>
+
+    <!-- ── Findings panel ─────────────────────────────────────────────────── -->
+    <section class="tab-panel hidden" id="panel-findings" role="tabpanel" aria-labelledby="tab-findings">
+      <div class="feed-header">
+        <span class="feed-title">Auth Findings</span>
+        <button class="btn-ghost" id="btn-export-findings" title="Export findings as JSON">Export</button>
+      </div>
+
+      <!-- Findings empty state -->
+      <div class="empty-state" id="findings-empty">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/>
+          <path d="M24 14v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="24" cy="32" r="1.5" fill="currentColor"/>
+        </svg>
+        <p>No authorization tests run yet.<br/>Click <strong>Test Auth</strong> on any feed item.</p>
+      </div>
+
+      <!-- Findings list (populated by popup.ts) -->
+      <div class="findings-list" id="findings-list" aria-label="Authorization test findings"></div>
     </section>
 
     <!-- ── Footer ─────────────────────────────────────────────────────── -->

@@ -6,7 +6,7 @@
 // Using a discriminated union ensures exhaustive handling in every switch.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { CapturedRequest, HunterStats, GraphQLRequestBody, SchemaModel } from './graphql';
+import type { CapturedRequest, HunterStats, GraphQLRequestBody, SchemaModel, AuthTestType, AuthTestResult } from './graphql';
 
 // ── Message definitions (discriminated union) ─────────────────────────────────
 
@@ -72,6 +72,18 @@ export interface MsgClearSchema {
   type: 'CLEAR_SCHEMA';
 }
 
+/** Popup → background: run an auth test against a captured request. */
+export interface MsgRunAuthTest {
+  type:    'RUN_AUTH_TEST';
+  payload: { requestId: string; testType: AuthTestType };
+}
+
+/** Background → popup: auth-test result (broadcast + direct response). */
+export interface MsgAuthTestResult {
+  type:    'AUTH_TEST_RESULT';
+  payload: AuthTestResult;
+}
+
 // ── Union type ────────────────────────────────────────────────────────────────
 
 export type HunterMessage =
@@ -84,6 +96,8 @@ export type HunterMessage =
   | MsgPageHookRequest
   | MsgGetSchema
   | MsgSchemaResponse
-  | MsgClearSchema;
+  | MsgClearSchema
+  | MsgRunAuthTest
+  | MsgAuthTestResult;
 
 export type MessageType = HunterMessage['type'];

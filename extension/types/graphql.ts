@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Core GraphQL domain types for GraphQL Hunter
 // Raw traffic types + Day 2 analysis types + Day 3 schema/complexity types
+// + Day 4 authorization testing + response-comparison types
 // all live here to avoid circular module imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,61 @@ export interface CapturedRequest {
   response?:   CapturedResponse;
   /** Populated by the Day 2/3 query analyzer immediately after capture. */
   analysis?:   RequestAnalysis;
+  /** Day 4: auth-test runs executed against this request. */
+  authTests?:  AuthTestResult[];
+}
+
+// ── Day 4: Authorization testing ─────────────────────────────────────────────
+
+/**
+ * Which auth-stripping strategy to run.
+ *   NO_AUTH       — remove Authorization header AND cookies
+ *   STRIP_COOKIES — remove only cookies (token may live in header)
+ *   MUTATE_ID     — replay with every ID variable ±1 (BOLA/IDOR probe)
+ */
+export type AuthTestType = 'NO_AUTH' | 'STRIP_COOKIES' | 'MUTATE_ID';
+
+/**
+ * Server's enforcement verdict after comparing original vs. replayed responses.
+ *   VULNERABLE    — server returned data without credentials (auth bypass)
+ *   PROTECTED     — server rejected or returned empty data
+ *   INCONCLUSIVE  — cannot determine (CORS block, network error, same response)
+ */
+export type AuthVerdict = 'VULNERABLE' | 'PROTECTED' | 'INCONCLUSIVE';
+
+/** A single field-level diff between the original and replayed responses. */
+export interface ResponseDiffEntry {
+  /** Dot-path to the field (e.g. "data.user.email"). */
+  path:           string;
+  originalValue:  unknown;
+  replayedValue:  unknown;
+  /** true when originalValue !== replayedValue (deep equality). */
+  changed:        boolean;
+}
+
+/** Full diff result between an original and a replayed GraphQL response. */
+export interface ResponseDiff {
+  entries:       ResponseDiffEntry[];
+  /** Fields that appeared in replayed response but were null/absent in original. */
+  leakedFields:  string[];
+  /** true when ALL compared fields are identical (no change detected). */
+  fullyIdentical: boolean;
+}
+
+/** Result of a single auth-test run against a captured request. */
+export interface AuthTestResult {
+  id:                string;
+  /** ID of the CapturedRequest this test was run against. */
+  requestId:         string;
+  testType:          AuthTestType;
+  testedAt:          number;
+  verdict:           AuthVerdict;
+  diff:              ResponseDiff;
+  /** HTTP status returned by the replayed request. */
+  replayedStatus:    number;
+  replayedDurationMs: number;
+  /** Human-readable summary of why the verdict was assigned. */
+  evidence:          string;
 }
 
 // ── Storage helpers ───────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import type { CapturedRequest, HunterStats, SchemaModel } from '../types/graphql';
+import type { CapturedRequest, HunterStats, SchemaModel, AuthTestResult } from '../types/graphql';
 import { emptySchemaModel } from '../analysis/schema-builder';
 
 const STORAGE_KEY        = 'gql_hunter_requests';
@@ -81,6 +81,35 @@ export async function updateSchema(model: SchemaModel): Promise<void> {
 
 export async function clearSchema(): Promise<void> {
   await browser.storage.local.remove(SCHEMA_STORAGE_KEY);
+}
+
+// ── Auth-test persistence (Day 4) ───────────────────────────────────────────
+
+/**
+ * Appends an AuthTestResult to the matching CapturedRequest record in storage.
+ * If no matching request is found, silently does nothing (request may have
+ * been cleared between test trigger and completion).
+ */
+export async function saveAuthTestResult(
+  requestId: string,
+  result:    AuthTestResult,
+): Promise<void> {
+  const requests = await getRequests();
+  const idx      = requests.findIndex(r => r.id === requestId);
+  if (idx === -1) return;
+
+  const req = requests[idx];
+  req.authTests = [...(req.authTests ?? []), result];
+  await browser.storage.local.set({ [STORAGE_KEY]: requests });
+}
+
+/**
+ * Returns all auth-test results for a given request ID, ordered oldest-first.
+ */
+export async function getAuthTestResults(requestId: string): Promise<AuthTestResult[]> {
+  const requests = await getRequests();
+  const req      = requests.find(r => r.id === requestId);
+  return req?.authTests ?? [];
 }
 
 // ── Aggregate stats ───────────────────────────────────────────────────────────

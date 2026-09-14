@@ -105,12 +105,13 @@ flowchart TD
         STORE -.-> UI["Live Reactive Dashboard"]
         UI --> TAB1["Traffic Feed + Risk & Depth Badges"]
         UI --> TAB2["Collapsible Schema Explorer Tree"]
+        UI --> TAB3["Auth Findings & Diff Viewer"]
     end
 
     classDef primary fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4;
     classDef secondary fill:#181825,stroke:#89b4fa,stroke-width:1.5px,color:#cdd6f4;
     classDef accent fill:#11111b,stroke:#f38ba8,stroke-width:1.5px,color:#cdd6f4;
-    class P,DOM_HOOK,CS,WR,SF,RO,MR,PROC,AST,RISK,COMP,SCH,STORE,UI,TAB1,TAB2 secondary;
+    class P,DOM_HOOK,CS,WR,SF,RO,MR,PROC,AST,RISK,COMP,SCH,STORE,UI,TAB1,TAB2,TAB3 secondary;
 ```
 
 ---
@@ -161,6 +162,40 @@ When introspection queries are blocked by WAFs or server settings, GraphQL Hunte
 
 ---
 
+<<<<<<< HEAD
+=======
+## 📐 Query Complexity & DoS Cost Engine
+
+GraphQL Hunter calculates the server-side impact of queries before exploitation:
+
+$$\text{Estimated Cost} = \sum (\text{Field Depth} \times \text{List Multiplier})$$
+
+* **Depth Calculation**: Recursively evaluates nested `SelectionSetNode` elements.
+* **List Multiplier ($\times 3$)**: Automatically applied to fields matching list patterns:
+  `/(list|all|search|find|filter|get[A-Z].*s$|.*List$|.*Nodes$|.*Edges$|.*Items$|.*Results$|.*Connection$)/`
+* **Fragment Spreads**: Safely handles inline fragments and assigns weighted baseline costs to named fragments.
+* **Alert Thresholds**: Automatically triggers when `depth > 5` or `cost > 100`.
+
+---
+
+## 🎯 Active BOLA & IDOR Validation Engine
+
+Day 4 adds an active authorization replay testing suite (`auth-tester.ts`, `response-comparator.ts`). Pen-testers can trigger immediate replay attacks against captured queries and mutations directly from the popup HUD:
+
+* **Replay Strategies**:
+  * `NO_AUTH` — Strips `Authorization` (Bearer tokens, API keys) and `Cookie` headers to test for unauthenticated access.
+  * `STRIP_COOKIES` — Strips session cookies while preserving headers to detect missing cookie validation.
+  * `MUTATE_ID` — Automatically detects ID-shaped variables (`id`, `uuid`, `pk`, `*Id`) and mutates them (`±1` or flipped UUID hex) to test for Broken Object Level Authorization (BOLA/IDOR).
+* **Automated Differential Analysis**: Deep field-level tree diffing compares original vs. replayed responses to identify leaked fields, empty payloads, and status codes.
+* **Automated Verdicts**:
+  * <span style="color:#ef4444;font-weight:bold;">VULNERABLE</span> — Server returned 2xx with data without authentication or under mutated IDs (data leakage detected).
+  * <span style="color:#22c55e;font-weight:bold;">PROTECTED</span> — Server returned 401/403 or empty data.
+  * <span style="color:#eab308;font-weight:bold;">INCONCLUSIVE</span> — Network error, CORS restriction, or ambiguous diff.
+* **Auth Findings Panel & JSON Export**: Dedicated HUD tab displaying detailed findings with leaked field tags, path diffs, latency, and 1-click JSON report export.
+
+---
+
+>>>>>>> 6ea981c (Replay & Differential Analysis Engines)
 ## 🖥️ Extension HUD (Popup Interface)
 
 The extension popup provides a dark, high-contrast tactical HUD designed for real-time situational awareness:
@@ -209,6 +244,88 @@ The compiled, ready-to-load extension will be generated in the `dist/` directory
 
 ---
 
+<<<<<<< HEAD
+=======
+## 🛠️ Project Structure
+
+```text
+GraphQL-Hunter/
+├── extension/
+│   ├── manifest.json              # WebExtension Manifest (v2 with Firefox Gecko config)
+│   ├── types/
+│   │   ├── graphql.ts             # Domain models (CapturedRequest, SchemaModel, RiskLevel)
+│   │   └── messages.ts            # Message definitions (Popup <-> Background <-> Content)
+│   ├── background/
+│   │   ├── background.ts          # Core service worker entry point
+│   │   ├── request-observer.ts    # webRequest + filterResponseData StreamFilter engine
+│   │   ├── message-router.ts      # Pub/sub broker for extension messages
+│   │   └── storage.ts             # Session persistence & schema store
+│   ├── content/
+│   │   ├── content.ts             # Isolated content script bridging DOM <-> Background
+│   │   └── page-hook.ts           # Page-world monkey-patch for fetch() & XMLHttpRequest
+│   ├── analysis/
+│   │   ├── query-analyzer.ts      # AST query parser & AST traversal engine
+│   │   ├── risk-scorer.ts         # Heuristic security risk scoring engine
+│   │   ├── complexity-scorer.ts   # Maximum depth & cost estimation (DoS defense)
+│   │   ├── schema-builder.ts      # Zero-introspection partial schema reconstructor
+│   │   ├── auth-tester.ts         # Replay engine with credential stripping & ID mutation
+│   │   └── response-comparator.ts # Field-level response diff & leak verdict engine
+│   └── popup/
+│       ├── popup.html             # HUD shell (Traffic feed, Schema panel, stats bar)
+│       ├── popup.css              # Cyberpunk dark theme styles
+│       └── popup.ts               # UI controller, live event listeners & tree renderer
+├── package.json                   # Dependencies, scripts & build configuration
+├── tsconfig.json                  # Strict TypeScript compiler options
+├── webpack.config.js              # Multi-target Webpack bundler & asset copy pipeline
+└── README.md                      # Project documentation
+```
+
+---
+
+## 🗺️ Development Roadmap
+
+GraphQL Hunter is being built through rapid, focused engineering sprints:
+
+- [x] **Day 1: Interception Core**
+  - Firefox `webRequest` API listener with `requestBody` decoding
+  - `filterResponseData()` response body streaming interception
+  - Page-world fetch/XHR hook for client-side queries
+  - Live HUD popup with real-time stats and feed
+- [x] **Day 2: AST Analysis & Risk Engine**
+  - AST parsing via `graphql` library
+  - Field and variable extractor
+  - Heuristic risk scorer (BOLA in mutations, Introspection detection, Over-fetching)
+  - Color-coded risk badges with diagnostic tooltips
+- [x] **Day 3: Schema Reconstruction & Complexity Scorer**
+  - Zero-introspection partial schema reconstruction from live ASTs
+  - Recursive AST query depth and complexity cost calculator
+  - Dual-view tab system in popup (Traffic vs. Schema)
+  - Interactive collapsible schema tree explorer with argument and frequency breakdown
+- [x] **Day 4: Active BOLA & IDOR Validation**
+  - Replay engine with 3 test strategies: `NO_AUTH`, `STRIP_COOKIES`, `MUTATE_ID` (BOLA/IDOR)
+  - Deep field-level response diffing with leaked field tracking & automated verdicts (`VULNERABLE`, `PROTECTED`, `INCONCLUSIVE`)
+  - Integrated split-button trigger & dropdown menu in traffic feed
+  - Dedicated "Auth Findings" tab with collapsible response diff cards and JSON export
+- [ ] **Day 5: Query Batching & Rate-Limit Bypass Fuzzing**
+  - Automated batching attack generation
+  - Aliased query amplification testing
+- [ ] **Day 6: CSRF & CORS Validator**
+  - Content-Type enforcement auditing (`application/json` vs `application/x-www-form-urlencoded`)
+  - Origin reflection checks
+- [ ] **Day 7: Directive Injection & Injection Scanner**
+  - `@skip` / `@include` logic flaw testing
+  - SQLi / NoSQLi payload fuzzing via GraphQL variables
+- [ ] **Day 8: Export & Reporting**
+  - SDL (Schema Definition Language) export
+  - Burp Suite / Postman collection export
+  - Markdown vulnerability report generator
+- [ ] **Day 9–10: Dedicated DevTools & Full-Page Dashboard**
+  - Full-screen offensive security workbench
+  - Interactive GraphQL playground with mutation replayer
+
+---
+
+>>>>>>> 6ea981c (Replay & Differential Analysis Engines)
 ## ⚙️ Available Scripts
 
 | Command | Action |

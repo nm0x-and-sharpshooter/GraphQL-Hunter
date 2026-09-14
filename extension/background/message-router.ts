@@ -7,7 +7,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import { getRequests, clearRequests, getStats, getSchema, clearSchema } from './storage';
+import { getRequests, clearRequests, getStats, getSchema, clearSchema, saveAuthTestResult } from './storage';
+import { runAuthTest } from '../analysis/auth-tester';
 import type { HunterMessage, PageHookPayload } from '../types/messages';
 
 export type PageHookHandler = (payload: PageHookPayload, tabId: number) => Promise<void>;
@@ -38,6 +39,22 @@ export function startMessageRouter(): void {
 
         case 'CLEAR_SCHEMA':
           return clearSchema().then(() => ({ ok: true }));
+
+        case 'RUN_AUTH_TEST':
+          return (async () => {
+            const { requestId, testType } = message.payload;
+            // Look up the original request by ID
+            const allRequests = await getRequests();
+            const target      = allRequests.find(r => r.id === requestId);
+            if (!target) {
+              return { ok: false, error: `Request ${requestId} not found.` };
+            }
+            // Run the test, persist, and broadcast
+            const result = await runAuthTest(target, testType);
+            await saveAuthTestResult(requestId, result);
+            await broadcast({ type: 'AUTH_TEST_RESULT', payload: result });
+            return result;
+          })();
 
         case 'PAGE_HOOK_REQUEST':
           if (pageHookHandler) {

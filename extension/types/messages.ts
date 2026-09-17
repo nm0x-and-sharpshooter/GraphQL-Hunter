@@ -6,7 +6,7 @@
 // Using a discriminated union ensures exhaustive handling in every switch.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { CapturedRequest, HunterStats, GraphQLRequestBody, SchemaModel, AuthTestType, AuthTestResult } from './graphql';
+import type { CapturedRequest, HunterStats, GraphQLRequestBody, SchemaModel, AuthTestType, AuthTestResult, Finding } from './graphql';
 
 // ── Message definitions (discriminated union) ─────────────────────────────────
 
@@ -84,6 +84,30 @@ export interface MsgAuthTestResult {
   payload: AuthTestResult;
 }
 
+// ── Day 5: Finding management messages ───────────────────────────────────────
+
+/** Popup/dashboard → background: fetch all persisted findings. */
+export interface MsgGetFindings {
+  type: 'GET_FINDINGS';
+}
+
+/** Background → popup/dashboard: response to GET_FINDINGS. */
+export interface MsgFindingsResponse {
+  type:    'FINDINGS_RESPONSE';
+  payload: Finding[];
+}
+
+/** Dashboard → background: attach/update an analyst note on a finding. */
+export interface MsgSaveFindingNote {
+  type:    'SAVE_FINDING_NOTE';
+  payload: { findingId: string; note: string };
+}
+
+/** Popup/dashboard → background: wipe all persisted findings. */
+export interface MsgClearFindings {
+  type: 'CLEAR_FINDINGS';
+}
+
 // ── Union type ────────────────────────────────────────────────────────────────
 
 export type HunterMessage =
@@ -98,6 +122,10 @@ export type HunterMessage =
   | MsgSchemaResponse
   | MsgClearSchema
   | MsgRunAuthTest
-  | MsgAuthTestResult;
+  | MsgAuthTestResult
+  | MsgGetFindings
+  | MsgFindingsResponse
+  | MsgSaveFindingNote
+  | MsgClearFindings;
 
 export type MessageType = HunterMessage['type'];

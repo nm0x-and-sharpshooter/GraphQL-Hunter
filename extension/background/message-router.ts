@@ -7,8 +7,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import { getRequests, clearRequests, getStats, getSchema, clearSchema, saveAuthTestResult } from './storage';
+import { getRequests, clearRequests, getStats, getSchema, clearSchema, saveAuthTestResult, saveFinding, getFindings, updateFindingNote, clearFindings } from './storage';
 import { runAuthTest } from '../analysis/auth-tester';
+import { generateCurl } from '../analysis/evidence-utils';
 import type { HunterMessage, PageHookPayload } from '../types/messages';
 
 export type PageHookHandler = (payload: PageHookPayload, tabId: number) => Promise<void>;
@@ -49,9 +50,18 @@ export function startMessageRouter(): void {
             if (!target) {
               return { ok: false, error: `Request ${requestId} not found.` };
             }
-            // Run the test, persist, and broadcast
+            // Run the test, persist auth-test result, and save as standalone finding
             const result = await runAuthTest(target, testType);
             await saveAuthTestResult(requestId, result);
+
+            // Day 5: also persist as a deduplicated Finding with curl + metadata
+            const bodies  = Array.isArray(target.body) ? target.body : [target.body];
+            const opName  = target.analysis?.operations[0]?.operationName
+                          ?? bodies[0]?.operationName
+                          ?? 'anonymous';
+            const curl    = generateCurl(target, testType);
+            await saveFinding(result, target.url, opName, curl);
+
             await broadcast({ type: 'AUTH_TEST_RESULT', payload: result });
             return result;
           })();
@@ -61,6 +71,19 @@ export function startMessageRouter(): void {
             return pageHookHandler(message.payload, sender.tab?.id ?? -1).then(() => ({ ok: true }));
           }
           return Promise.resolve({ ok: true });
+
+        // ── Day 5: Finding management ───────────────────────────────────────
+        case 'GET_FINDINGS':
+          return getFindings();
+
+        case 'SAVE_FINDING_NOTE':
+          return updateFindingNote(
+            message.payload.findingId,
+            message.payload.note,
+          ).then(() => ({ ok: true }));
+
+        case 'CLEAR_FINDINGS':
+          return clearFindings().then(() => ({ ok: true }));
 
         default:
           // Not a message we handle — let Firefox know we didn't respond.

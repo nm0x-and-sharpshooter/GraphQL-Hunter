@@ -29,6 +29,7 @@ const elEndpoints     = document.getElementById('stat-endpoints')!;
 const elMutations     = document.getElementById('stat-mutations')!;
 const elBatch         = document.getElementById('stat-batch')!;
 const elRisks         = document.getElementById('stat-risks')!;
+const elVulns         = document.getElementById('stat-vulns')!;
 const elFeed          = document.getElementById('feed')!;
 const elEmpty         = document.getElementById('empty-state')!;
 const btnClear        = document.getElementById('btn-clear')!;
@@ -323,6 +324,9 @@ function renderStats(stats: HunterStats): void {
   elBatch.textContent     = String(stats.batchCount);
   if (elRisks) {
     elRisks.textContent   = String(stats.riskCount ?? 0);
+  }
+  if (elVulns) {
+    elVulns.textContent   = String(stats.vulnerableCount ?? 0);
   }
 }
 

@@ -2,6 +2,7 @@
 // Core GraphQL domain types for GraphQL Hunter
 // Raw traffic types + Day 2 analysis types + Day 3 schema/complexity types
 // + Day 4 authorization testing + response-comparison types
+// + Day 5 finding/evidence management types
 // all live here to avoid circular module imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -212,14 +213,58 @@ export interface AuthTestResult {
   evidence:          string;
 }
 
+// ── Day 5: Finding & Evidence Management ─────────────────────────────────────
+
+/**
+ * Numeric severity rank used for sorting and triage.
+ *   0 = PROTECTED  (no vulnerability found)
+ *   1 = INCONCLUSIVE (couldn't determine)
+ *   2 = VULNERABLE  (confirmed auth bypass)
+ */
+export type SeverityScore = 0 | 1 | 2;
+
+/**
+ * A persisted finding — wraps an AuthTestResult with additional context
+ * (request URL, operation name, pre-computed severity score, user note, curl).
+ * Stored independently from CapturedRequest so it survives CLEAR_REQUESTS.
+ */
+export interface Finding {
+  /** Unique finding ID (same as AuthTestResult.id). */
+  id:            string;
+  /** ID of the originating CapturedRequest (may no longer be in storage). */
+  requestId:     string;
+  /** Full GraphQL endpoint URL of the original request. */
+  requestUrl:    string;
+  /** Primary operation name (or 'anonymous'). */
+  operationName: string;
+  /** The full auth-test result. */
+  result:        AuthTestResult;
+  /** Pre-computed numeric severity for sorting. */
+  severityScore: SeverityScore;
+  /** Optional analyst note attached by the user. */
+  note:          string;
+  /** Pre-generated curl command reproducing the replayed request. */
+  curl:          string;
+}
+
+/** Top-level shape of the dedicated findings storage slot. */
+export interface FindingsStore {
+  findings:    Finding[];
+  lastUpdated: number;
+}
+
 // ── Storage helpers ───────────────────────────────────────────────────────────
 
-/** Aggregate stats displayed in the popup. */
+/** Aggregate stats displayed in the popup and dashboard. */
 export interface HunterStats {
-  totalRequests: number;
-  endpoints:     string[];
-  batchCount:    number;
-  mutationCount: number;
-  queryCount:    number;
-  riskCount:     number;
+  totalRequests:    number;
+  endpoints:        string[];
+  batchCount:       number;
+  mutationCount:    number;
+  queryCount:       number;
+  riskCount:        number;
+  /** Day 5: finding verdict counts */
+  vulnerableCount:  number;
+  inconclusiveCount: number;
+  protectedCount:   number;
 }

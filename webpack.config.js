@@ -8,10 +8,11 @@ module.exports = (env, argv) => {
 
   return {
     entry: {
-      'background/background': './extension/background/background.ts',
-      'popup/popup':           './extension/popup/popup.ts',
-      'content/content':       './extension/content/content.ts',
-      'content/page-hook':     './extension/content/page-hook.ts',
+      'background/background':  './extension/background/background.ts',
+      'popup/popup':            './extension/popup/popup.ts',
+      'content/content':        './extension/content/content.ts',
+      'content/page-hook':      './extension/content/page-hook.ts',
+      'dashboard/dashboard':    './extension/dashboard/dashboard.ts',
     },
     output: {
       path: path.resolve(__dirname, 'dist'),
@@ -52,6 +53,9 @@ module.exports = (env, argv) => {
           // Popup HTML and CSS (JS is bundled by webpack)
           { from: 'extension/popup/popup.html', to: 'popup/popup.html' },
           { from: 'extension/popup/popup.css',  to: 'popup/popup.css'  },
+          // Dashboard HTML and CSS (JS is bundled by webpack)
+          { from: 'extension/dashboard/dashboard.html', to: 'dashboard/dashboard.html' },
+          { from: 'extension/dashboard/dashboard.css',  to: 'dashboard/dashboard.css'  },
           // Icons
           {
             from: 'extension/icons',

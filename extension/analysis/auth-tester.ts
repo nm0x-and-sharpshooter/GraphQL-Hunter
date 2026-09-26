@@ -23,7 +23,7 @@ import type {
   GraphQLResponseBody,
   ResponseDiff,
 } from '../types/graphql';
-import { compareResponses, isVulnerable } from './response-comparator';
+import { compareResponses } from './response-comparator';
 
 // ── Patterns ──────────────────────────────────────────────────────────────────
 
@@ -41,14 +41,15 @@ const AUTH_HEADERS = new Set([
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function _stripAuthHeaders(
-  headers: Record<string, string>,
+  headers:      Record<string, string>,
+  stripAuth:    boolean,
   stripCookies: boolean,
 ): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) {
     const lower = k.toLowerCase();
-    if (AUTH_HEADERS.has(lower)) continue;
-    if (stripCookies && lower === 'cookie') continue;
+    if (stripAuth    && AUTH_HEADERS.has(lower)) continue;
+    if (stripCookies && lower === 'cookie')       continue;
     result[k] = v;
   }
   return result;
@@ -91,9 +92,11 @@ function _buildHeaders(
 ): Record<string, string> {
   switch (testType) {
     case 'NO_AUTH':
-      return _stripAuthHeaders(original, true);
+      // Strip Authorization header AND Cookie header
+      return _stripAuthHeaders(original, true, true);
     case 'STRIP_COOKIES':
-      return _stripAuthHeaders(original, true); // strip cookies only
+      // Strip only Cookie header — keep Authorization header intact
+      return _stripAuthHeaders(original, false, true);
     case 'MUTATE_ID':
       // Keep all headers unchanged — we only mutate the body
       return { ...original };
@@ -173,7 +176,7 @@ function _deriveVerdict(
     };
   }
 
-  // No data leaked → check if everything was null
+  // No data leaked → everything was null/empty
   if (diff.leakedFields.length === 0) {
     return {
       verdict:  'PROTECTED',
@@ -181,21 +184,24 @@ function _deriveVerdict(
     };
   }
 
-  if (isVulnerable(diff)) {
-    const fieldSample = diff.leakedFields.slice(0, 5).join(', ');
-    const testLabel   = testType === 'NO_AUTH'       ? 'without auth headers'
-                      : testType === 'STRIP_COOKIES' ? 'with cookies stripped'
-                      : 'with mutated ID variables';
-
+  // Replayed response is byte-for-byte identical to original — cannot distinguish
+  // a genuine auth bypass from a cached/passthrough response (e.g. CORS opaque).
+  if (diff.fullyIdentical) {
     return {
-      verdict:  'VULNERABLE',
-      evidence: `Server returned data ${testLabel}. Leaked fields: ${fieldSample}${diff.leakedFields.length > 5 ? ` (+${diff.leakedFields.length - 5} more)` : ''}.`,
+      verdict:  'INCONCLUSIVE',
+      evidence: `Replayed response was identical to the original. Cannot determine whether this is an auth bypass or a cached/passthrough response.`,
     };
   }
 
+  // Data was returned without credentials → VULNERABLE
+  const fieldSample = diff.leakedFields.slice(0, 5).join(', ');
+  const testLabel   = testType === 'NO_AUTH'       ? 'without auth headers'
+                    : testType === 'STRIP_COOKIES' ? 'with cookies stripped'
+                    : 'with mutated ID variables';
+
   return {
-    verdict:  'INCONCLUSIVE',
-    evidence: `Response received but could not determine leak status. Diff entries: ${diff.entries.length}, leaked: ${diff.leakedFields.length}.`,
+    verdict:  'VULNERABLE',
+    evidence: `Server returned data ${testLabel}. Leaked fields: ${fieldSample}${diff.leakedFields.length > 5 ? ` (+${diff.leakedFields.length - 5} more)` : ''}.`,
   };
 }
 

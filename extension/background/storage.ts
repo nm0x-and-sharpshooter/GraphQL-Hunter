@@ -6,14 +6,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import type { CapturedRequest, HunterStats, SchemaModel, AuthTestResult, Finding, FindingsStore } from '../types/graphql';
+import type { CapturedRequest, HunterStats, SchemaModel, AuthTestResult, Finding, FindingsStore, AttackJob, AttackJobStore } from '../types/graphql';
 import { emptySchemaModel } from '../analysis/schema-builder';
 import { severityScore, generateCurl } from '../analysis/evidence-utils';
 
-const STORAGE_KEY          = 'gql_hunter_requests';
-const SCHEMA_STORAGE_KEY   = 'gql_hunter_schema';
-const FINDINGS_STORAGE_KEY = 'gql_hunter_findings';
-const MAX_STORED           = 500;
+const STORAGE_KEY               = 'gql_hunter_requests';
+const SCHEMA_STORAGE_KEY        = 'gql_hunter_schema';
+const FINDINGS_STORAGE_KEY      = 'gql_hunter_findings';
+const ATTACK_JOBS_STORAGE_KEY   = 'gql_hunter_attack_jobs';
+const MAX_STORED                = 500;
+const MAX_ATTACK_JOBS           = 200;
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
@@ -248,6 +250,12 @@ export async function getStats(): Promise<HunterStats> {
   const inconclusiveCount = findings.filter(f => f.result.verdict === 'INCONCLUSIVE').length;
   const protectedCount    = findings.filter(f => f.result.verdict === 'PROTECTED').length;
 
+  // Day 6: attack job counts
+  const attackJobs     = await getAttackJobs();
+  const attackJobCount = attackJobs.length;
+  const attackHitCount = attackJobs.reduce((n, j) =>
+    n + j.payloads.filter(p => p.outcome === 'HIT').length, 0);
+
   return {
     totalRequests:    requests.length,
     endpoints:        [...seen],
@@ -258,5 +266,53 @@ export async function getStats(): Promise<HunterStats> {
     vulnerableCount,
     inconclusiveCount,
     protectedCount,
+    attackJobCount,
+    attackHitCount,
   };
+}
+
+// ── Attack-job persistence (Day 6) ──────────────────────────────────────
+
+async function _getAttackJobStore(): Promise<AttackJobStore> {
+  const result = await browser.storage.local.get(ATTACK_JOBS_STORAGE_KEY);
+  return (result[ATTACK_JOBS_STORAGE_KEY] as AttackJobStore | undefined)
+    ?? { jobs: [], lastUpdated: 0 };
+}
+
+/**
+ * Persists a completed AttackJob.
+ * Deduplicates by job.id; replaces any existing record with the same ID.
+ * Trims to MAX_ATTACK_JOBS (newest-first) to respect storage quota.
+ */
+export async function saveAttackJob(job: AttackJob): Promise<void> {
+  const store = await _getAttackJobStore();
+
+  // Remove existing entry with same ID if present
+  store.jobs = store.jobs.filter(j => j.id !== job.id);
+
+  // Prepend newest
+  store.jobs.unshift(job);
+
+  // Trim
+  if (store.jobs.length > MAX_ATTACK_JOBS) {
+    store.jobs = store.jobs.slice(0, MAX_ATTACK_JOBS);
+  }
+
+  store.lastUpdated = Date.now();
+  await browser.storage.local.set({ [ATTACK_JOBS_STORAGE_KEY]: store });
+}
+
+/**
+ * Returns all attack jobs, sorted newest-first.
+ */
+export async function getAttackJobs(): Promise<AttackJob[]> {
+  const store = await _getAttackJobStore();
+  return store.jobs.sort((a, b) => b.startedAt - a.startedAt);
+}
+
+/**
+ * Removes all stored attack jobs.
+ */
+export async function clearAttackJobs(): Promise<void> {
+  await browser.storage.local.remove(ATTACK_JOBS_STORAGE_KEY);
 }

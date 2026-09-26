@@ -8,6 +8,7 @@
 //   - Render risk badges, complexity scores, and field counts per captured query
 //   - Day 4: Trigger authorization tests (NO_AUTH, STRIP_COOKIES, MUTATE_ID)
 //   - Day 4: Render active auth findings, response diffs, and export reports
+//   - Day 6: Launch active attacks from the Attack Engine tab
 //   - Clear button handling & tab switching
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -19,50 +20,67 @@ import type {
   SchemaModel,
   AuthTestType,
   AuthTestResult,
+  AttackJob,
+  AttackType,
 } from '../types/graphql';
 import type { HunterMessage } from '../types/messages';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
-const elTotal         = document.getElementById('stat-total')!;
-const elEndpoints     = document.getElementById('stat-endpoints')!;
-const elMutations     = document.getElementById('stat-mutations')!;
-const elBatch         = document.getElementById('stat-batch')!;
-const elRisks         = document.getElementById('stat-risks')!;
-const elVulns         = document.getElementById('stat-vulns')!;
-const elFeed          = document.getElementById('feed')!;
-const elEmpty         = document.getElementById('empty-state')!;
-const btnClear        = document.getElementById('btn-clear')!;
-const btnDash         = document.getElementById('btn-dashboard')!;
+const elTotal = document.getElementById('stat-total')!;
+const elEndpoints = document.getElementById('stat-endpoints')!;
+const elMutations = document.getElementById('stat-mutations')!;
+const elBatch = document.getElementById('stat-batch')!;
+const elRisks = document.getElementById('stat-risks')!;
+const elVulns = document.getElementById('stat-vulns')!;
+const elFeed = document.getElementById('feed')!;
+const elEmpty = document.getElementById('empty-state')!;
+const btnClear = document.getElementById('btn-clear')!;
+const btnDash = document.getElementById('btn-dashboard')!;
 
 // ── Day 3: Tab + Schema DOM refs ──────────────────────────────────────────────
-const btnTabTraffic   = document.getElementById('tab-traffic')!;
-const btnTabSchema    = document.getElementById('tab-schema')!;
-const panelTraffic    = document.getElementById('panel-traffic')!;
-const panelSchema     = document.getElementById('panel-schema')!;
-const elSchemaEmpty   = document.getElementById('schema-empty')!;
-const elSchemaStats   = document.getElementById('schema-stats')!;
-const elSchemaTree    = document.getElementById('schema-tree')!;
-const elSchemaEps     = document.getElementById('schema-endpoints')!;
-const elEndpointList  = document.getElementById('endpoint-list')!;
-const elSchemaStatTypes    = document.getElementById('schema-stat-types')!;
-const elSchemaStatFields   = document.getElementById('schema-stat-fields')!;
+const btnTabTraffic = document.getElementById('tab-traffic')!;
+const btnTabSchema = document.getElementById('tab-schema')!;
+const panelTraffic = document.getElementById('panel-traffic')!;
+const panelSchema = document.getElementById('panel-schema')!;
+const elSchemaEmpty = document.getElementById('schema-empty')!;
+const elSchemaStats = document.getElementById('schema-stats')!;
+const elSchemaTree = document.getElementById('schema-tree')!;
+const elSchemaEps = document.getElementById('schema-endpoints')!;
+const elEndpointList = document.getElementById('endpoint-list')!;
+const elSchemaStatTypes = document.getElementById('schema-stat-types')!;
+const elSchemaStatFields = document.getElementById('schema-stat-fields')!;
 const elSchemaStatEndpoints = document.getElementById('schema-stat-endpoints')!;
-const elSchemaTypeCount    = document.getElementById('schema-type-count')!;
-const btnClearSchema  = document.getElementById('btn-clear-schema')!;
+const elSchemaTypeCount = document.getElementById('schema-type-count')!;
+const btnClearSchema = document.getElementById('btn-clear-schema')!;
 
 // ── Day 4: Findings / Auth Tests DOM refs ─────────────────────────────────────
-const btnTabFindings    = document.getElementById('tab-findings')!;
-const panelFindings     = document.getElementById('panel-findings')!;
-const elFindingsCount   = document.getElementById('findings-count')!;
-const elFindingsEmpty   = document.getElementById('findings-empty')!;
-const elFindingsList    = document.getElementById('findings-list')!;
+const btnTabFindings = document.getElementById('tab-findings')!;
+const panelFindings = document.getElementById('panel-findings')!;
+const elFindingsCount = document.getElementById('findings-count')!;
+const elFindingsEmpty = document.getElementById('findings-empty')!;
+const elFindingsList = document.getElementById('findings-list')!;
 const btnExportFindings = document.getElementById('btn-export-findings')!;
+
+// ── Day 6: Attack Engine DOM refs ─────────────────────────────────────────────
+const btnTabAttack = document.getElementById('tab-attack')!;
+const panelAttack = document.getElementById('panel-attack')!;
+const elAttackHitCount = document.getElementById('attack-hit-count')!;
+const elAttackTarget = document.getElementById('attack-target-select') as HTMLSelectElement;
+const elAttackRunningRow = document.getElementById('attack-running-row')!;
+const elAttackRunLabel = document.getElementById('attack-running-label')!;
+const elAttackResults = document.getElementById('attack-results')!;
+const elAttackEmpty = document.getElementById('attack-empty')!;
+const btnClearAttacks = document.getElementById('btn-clear-attacks')!;
+const elAttackPreserveAuth = document.getElementById('attack-preserve-auth') as HTMLInputElement;
+const elAttackDepth = document.getElementById('attack-depth-override') as HTMLInputElement;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
 let currentRequests: CapturedRequest[] = [];
 const pendingTests = new Set<string>();
+let attackJobs: AttackJob[] = [];
+let attackRunning = false;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -78,7 +96,7 @@ function escapeHtml(str: string): string {
 /** Infer operation type from query string. */
 function inferType(query: string): 'query' | 'mutation' | 'sub' {
   const t = query.trim().toLowerCase();
-  if (t.startsWith('mutation'))     return 'mutation';
+  if (t.startsWith('mutation')) return 'mutation';
   if (t.startsWith('subscription')) return 'sub';
   return 'query';
 }
@@ -145,7 +163,7 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
     : [req.body];
 
   const primaryBody = bodies[0];
-  const primaryOp   = req.analysis?.operations[0];
+  const primaryOp = req.analysis?.operations[0];
 
   // Derive operation type & name (prefer AST analysis, fallback to regex)
   const opType = (primaryOp && primaryOp.operationType !== 'unknown')
@@ -156,26 +174,26 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
     ? primaryOp.operationName
     : primaryBody.operationName ?? inferName(primaryBody.query);
 
-  const isBatch    = req.isBatch;
+  const isBatch = req.isBatch;
   const statusCode = req.response?.status;
-  const duration   = req.response?.durationMs;
+  const duration = req.response?.durationMs;
 
   const badgeClass = isBatch ? 'batch' : opType;
   const badgeLabel = isBatch
     ? `B${bodies.length}`
     : opType === 'mutation' ? 'MUT'
-    : opType === 'sub'      ? 'SUB'
-    : 'QRY';
+      : opType === 'sub' ? 'SUB'
+        : 'QRY';
 
   const statusClass = statusCode == null ? 'pending'
-                    : statusCode < 400   ? 'ok'
-                    : 'err';
-  const statusText  = statusCode?.toString() ?? '…';
+    : statusCode < 400 ? 'ok'
+      : 'err';
+  const statusText = statusCode?.toString() ?? '…';
 
   // Day 2: Risk badge and field count
   const totalFields = req.analysis?.operations.reduce((n, o) => n + o.fieldCount, 0);
-  const riskLevel   = req.analysis?.overallRisk ?? 'INFO';
-  const riskClass   = riskLevel.toLowerCase();
+  const riskLevel = req.analysis?.overallRisk ?? 'INFO';
+  const riskClass = riskLevel.toLowerCase();
 
   const topFinding = primaryOp?.findings.find(f => f.level === riskLevel) ?? primaryOp?.findings[0];
   const tooltipText = topFinding
@@ -191,8 +209,8 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
     : '';
 
   // Day 3: Complexity badge
-  const complexity       = primaryOp?.complexity;
-  const complexityHtml   = complexity && complexity.depth > 2
+  const complexity = primaryOp?.complexity;
+  const complexityHtml = complexity && complexity.depth > 2
     ? `<span class="complexity-badge ${complexity.isHighComplexity ? 'high' : ''}" title="Depth: ${complexity.depth} | Cost: ${complexity.estimatedCost}">d${complexity.depth}</span>`
     : '';
 
@@ -241,11 +259,16 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
             <strong>Mutate IDs</strong>
             <span>Test BOLA / IDOR with ID ±1</span>
           </button>
+          <div class="auth-menu-divider"></div>
+          <button class="auth-menu-item" type="button" data-action="attack-target">
+            <strong>⚡ Launch Attack…</strong>
+            <span>Send to Active Attack Engine</span>
+          </button>
         </div>
       </div>`;
   }
 
-  const item     = document.createElement('div');
+  const item = document.createElement('div');
   item.className = 'feed-item';
   item.setAttribute('role', 'listitem');
   item.innerHTML = `
@@ -275,7 +298,7 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
   }
 
   const btnCaret = item.querySelector<HTMLButtonElement>('[data-action="toggle-menu"]');
-  const menu     = item.querySelector<HTMLElement>(`#menu-${req.id}`);
+  const menu = item.querySelector<HTMLElement>(`#menu-${req.id}`);
   if (btnCaret && menu) {
     btnCaret.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -291,8 +314,16 @@ function buildFeedItem(req: CapturedRequest): HTMLElement {
     mi.addEventListener('click', (e) => {
       e.stopPropagation();
       if (menu) menu.classList.add('hidden');
-      const strategy = mi.getAttribute('data-strategy') as AuthTestType;
-      triggerAuthTest(req, strategy);
+      if (mi.dataset.action === 'attack-target') {
+        renderAttackTargetSelect(currentRequests);
+        elAttackTarget.value = req.id;
+        switchTab('attack');
+        return;
+      }
+      const strategy = mi.getAttribute('data-strategy') as AuthTestType | null;
+      if (strategy) {
+        triggerAuthTest(req, strategy);
+      }
     });
   });
 
@@ -318,22 +349,22 @@ function renderFeed(requests: CapturedRequest[]): void {
 }
 
 function renderStats(stats: HunterStats): void {
-  elTotal.textContent     = String(stats.totalRequests);
+  elTotal.textContent = String(stats.totalRequests);
   elEndpoints.textContent = String(stats.endpoints.length);
   elMutations.textContent = String(stats.mutationCount);
-  elBatch.textContent     = String(stats.batchCount);
+  elBatch.textContent = String(stats.batchCount);
   if (elRisks) {
-    elRisks.textContent   = String(stats.riskCount ?? 0);
+    elRisks.textContent = String(stats.riskCount ?? 0);
   }
   if (elVulns) {
-    elVulns.textContent   = String(stats.vulnerableCount ?? 0);
+    elVulns.textContent = String(stats.vulnerableCount ?? 0);
   }
 }
 
 // ── Day 3: Schema rendering ───────────────────────────────────────────────────
 
 function renderSchema(model: SchemaModel): void {
-  const typeNames  = Object.keys(model.types);
+  const typeNames = Object.keys(model.types);
   const totalTypes = typeNames.length;
   const totalFields = typeNames.reduce(
     (n, t) => n + Object.keys(model.types[t].fields).length, 0,
@@ -343,18 +374,18 @@ function renderSchema(model: SchemaModel): void {
   elSchemaTypeCount.textContent = String(totalTypes);
 
   if (totalTypes === 0) {
-    elSchemaEmpty.style.display  = '';
-    elSchemaStats.style.display  = 'none';
-    elSchemaTree.innerHTML       = '';
-    elSchemaEps.style.display    = 'none';
+    elSchemaEmpty.style.display = '';
+    elSchemaStats.style.display = 'none';
+    elSchemaTree.innerHTML = '';
+    elSchemaEps.style.display = 'none';
     return;
   }
 
   // Stats bar
-  elSchemaEmpty.style.display       = 'none';
-  elSchemaStats.style.display       = '';
-  elSchemaStatTypes.textContent     = String(totalTypes);
-  elSchemaStatFields.textContent    = String(totalFields);
+  elSchemaEmpty.style.display = 'none';
+  elSchemaStats.style.display = '';
+  elSchemaStatTypes.textContent = String(totalTypes);
+  elSchemaStatFields.textContent = String(totalFields);
   elSchemaStatEndpoints.textContent = String(model.endpoints.length);
 
   // Type tree
@@ -376,19 +407,19 @@ function renderSchema(model: SchemaModel): void {
       </div>
       <div class="schema-field-list" role="list">
         ${fieldNames.sort().map(fn => {
-          const f = schemaType.fields[fn];
-          const argsText = f.args.length > 0 ? `(${f.args.join(', ')})` : '';
-          const opPills  = f.seenInOps
-            .map(op => `<span class="schema-op-pill ${op}">${op === 'subscription' ? 'sub' : op}</span>`)
-            .join('');
-          return `
+      const f = schemaType.fields[fn];
+      const argsText = f.args.length > 0 ? `(${f.args.join(', ')})` : '';
+      const opPills = f.seenInOps
+        .map(op => `<span class="schema-op-pill ${op}">${op === 'subscription' ? 'sub' : op}</span>`)
+        .join('');
+      return `
             <div class="schema-field-row" role="listitem">
               <span class="schema-field-name">${escapeHtml(fn)}</span>
               ${argsText ? `<span class="schema-field-args">${escapeHtml(argsText)}</span>` : ''}
               <span class="schema-field-ops">${opPills}</span>
               <span class="schema-field-count" title="${f.observationCount} observations">×${f.observationCount}</span>
             </div>`;
-        }).join('')}
+    }).join('')}
       </div>
     `;
 
@@ -410,7 +441,7 @@ function renderSchema(model: SchemaModel): void {
   // Endpoints
   if (model.endpoints.length > 0) {
     elSchemaEps.style.display = '';
-    elEndpointList.innerHTML  = model.endpoints
+    elEndpointList.innerHTML = model.endpoints
       .map(ep => `<li class="endpoint-item">${escapeHtml(ep)}</li>`)
       .join('');
   } else {
@@ -501,26 +532,115 @@ function renderFindings(requests: CapturedRequest[]): void {
   }
 }
 
+// ── Day 6: Attack Engine rendering ─────────────────────────────────────────
+
+/** Populate the target request <select> with the current captured requests. */
+function renderAttackTargetSelect(requests: CapturedRequest[]): void {
+  const existing = elAttackTarget.value;
+  elAttackTarget.innerHTML = '<option value="">-- select a captured request --</option>';
+  for (const req of requests) {
+    const bodies = Array.isArray(req.body) ? req.body : [req.body];
+    const opName = req.analysis?.operations[0]?.operationName
+      ?? inferName(bodies[0]?.query ?? '')
+      ?? 'anonymous';
+    const opt = document.createElement('option');
+    opt.value = req.id;
+    opt.textContent = `${opName} — ${req.url.replace(/^https?:\/\//, '').slice(0, 40)}`;
+    elAttackTarget.appendChild(opt);
+  }
+  // Restore previous selection if still valid
+  if (existing && Array.from(elAttackTarget.options).some(o => o.value === existing)) {
+    elAttackTarget.value = existing;
+  }
+}
+
+/** Render all stored attack job results into the results area. */
+function renderAttackResults(jobs: AttackJob[]): void {
+  // Remove old result cards, preserve empty state
+  const cards = elAttackResults.querySelectorAll('.attack-result-card');
+  cards.forEach(c => c.remove());
+
+  if (jobs.length === 0) {
+    elAttackEmpty.classList.remove('hidden');
+    return;
+  }
+  elAttackEmpty.classList.add('hidden');
+
+  // Count hits for the tab badge
+  const totalHits = jobs.reduce((n, j) =>
+    n + j.payloads.filter(p => p.outcome === 'HIT').length, 0);
+  elAttackHitCount.textContent = String(totalHits);
+
+  for (const job of jobs) {
+    const hitCount = job.payloads.filter(p => p.outcome === 'HIT').length;
+    const blockedCount = job.payloads.filter(p => p.outcome === 'BLOCKED').length;
+    const errCount = job.payloads.filter(p => p.outcome === 'ERROR').length;
+    const dominantOutcome = hitCount > 0 ? 'HIT'
+      : blockedCount > 0 ? 'BLOCKED'
+        : errCount > 0 ? 'ERROR'
+          : 'MISS';
+
+    const fuzzHitsHtml = job.fuzzHits.length > 0
+      ? `<div class="atk-fuzz-hits">
+          <div class="atk-fuzz-hits-title">&#x1F3AF; Fuzz Hits (${job.fuzzHits.length})</div>
+          ${job.fuzzHits.slice(0, 20).map(h =>
+        `<span class="atk-fuzz-chip" title="${escapeHtml(h.evidence)}">${escapeHtml(h.field)}</span>`
+      ).join('')}
+          ${job.fuzzHits.length > 20 ? `<span class="atk-fuzz-chip">+${job.fuzzHits.length - 20} more</span>` : ''}
+        </div>`
+      : '';
+
+    const firstPayload = job.payloads[0];
+    const evidenceText = firstPayload?.evidence ?? job.summary;
+
+    const card = document.createElement('div');
+    card.className = `attack-result-card ${dominantOutcome}`;
+    card.innerHTML = `
+      <div class="atk-result-header">
+        <span class="atk-result-type">${escapeHtml(job.attackType.replace(/_/g, ' '))}</span>
+        <span class="atk-outcome-badge ${dominantOutcome}">${dominantOutcome}</span>
+      </div>
+      <div class="atk-result-summary">${escapeHtml(evidenceText)}</div>
+      <div class="atk-result-meta">
+        <span>${job.payloads.length} payload${job.payloads.length !== 1 ? 's' : ''}</span>
+        <span>${hitCount} hit${hitCount !== 1 ? 's' : ''}</span>
+        <span>${blockedCount} blocked</span>
+        <span>${fmtMs(job.completedAt - job.startedAt)}</span>
+      </div>
+      ${fuzzHitsHtml}
+    `;
+    elAttackResults.appendChild(card);
+  }
+}
+
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 async function refresh(): Promise<void> {
-  const [requests, stats, schema] = await Promise.all([
+  const [requests, stats, schema, jobs] = await Promise.all([
     browser.runtime.sendMessage({ type: 'GET_CAPTURED_REQUESTS' }) as Promise<CapturedRequest[]>,
-    browser.runtime.sendMessage({ type: 'GET_STATS' })              as Promise<HunterStats>,
-    browser.runtime.sendMessage({ type: 'GET_SCHEMA' })             as Promise<SchemaModel>,
+    browser.runtime.sendMessage({ type: 'GET_STATS' }) as Promise<HunterStats>,
+    browser.runtime.sendMessage({ type: 'GET_SCHEMA' }) as Promise<SchemaModel>,
+    browser.runtime.sendMessage({ type: 'GET_ATTACK_JOBS' }) as Promise<AttackJob[]>,
   ]);
   currentRequests = requests ?? [];
+  attackJobs = jobs ?? [];
   renderFeed(currentRequests);
-  renderStats(stats ?? { totalRequests: 0, endpoints: [], batchCount: 0, mutationCount: 0, queryCount: 0, riskCount: 0 });
+  renderStats(stats ?? { totalRequests: 0, endpoints: [], batchCount: 0, mutationCount: 0, queryCount: 0, riskCount: 0, vulnerableCount: 0, inconclusiveCount: 0, protectedCount: 0, attackJobCount: 0, attackHitCount: 0 });
   renderSchema(schema ?? { types: {}, endpoints: [], lastUpdated: 0 });
   renderFindings(currentRequests);
+  renderAttackTargetSelect(currentRequests);
+  renderAttackResults(attackJobs);
 }
 
 // ── Live updates from background ──────────────────────────────────────────────
 
 browser.runtime.onMessage.addListener((raw: unknown) => {
   const msg = raw as HunterMessage;
-  if (msg.type === 'GRAPHQL_REQUEST_CAPTURED' || msg.type === 'AUTH_TEST_RESULT') {
+  if (
+    msg.type === 'GRAPHQL_REQUEST_CAPTURED' ||
+    msg.type === 'AUTH_TEST_RESULT' ||
+    msg.type === 'ATTACK_RESULT'
+  ) {
     refresh();
   }
 });
@@ -559,31 +679,82 @@ btnExportFindings.addEventListener('click', () => {
   if (findings.length === 0) return;
 
   const blob = new Blob([JSON.stringify(findings, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = `graphql-hunter-auth-findings-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 });
 
-// Day 3 & Day 4: Tab switching
-function switchTab(target: 'traffic' | 'schema' | 'findings'): void {
+// Day 3, Day 4 & Day 6: Tab switching
+function switchTab(target: 'traffic' | 'schema' | 'findings' | 'attack'): void {
   btnTabTraffic.classList.toggle('active', target === 'traffic');
   btnTabTraffic.setAttribute('aria-selected', String(target === 'traffic'));
   btnTabSchema.classList.toggle('active', target === 'schema');
   btnTabSchema.setAttribute('aria-selected', String(target === 'schema'));
   btnTabFindings.classList.toggle('active', target === 'findings');
   btnTabFindings.setAttribute('aria-selected', String(target === 'findings'));
+  btnTabAttack.classList.toggle('active', target === 'attack');
+  btnTabAttack.setAttribute('aria-selected', String(target === 'attack'));
 
   panelTraffic.classList.toggle('hidden', target !== 'traffic');
   panelSchema.classList.toggle('hidden', target !== 'schema');
   panelFindings.classList.toggle('hidden', target !== 'findings');
+  panelAttack.classList.toggle('hidden', target !== 'attack');
 }
 
-btnTabTraffic.addEventListener('click',  () => switchTab('traffic'));
-btnTabSchema.addEventListener('click',   () => switchTab('schema'));
+btnTabTraffic.addEventListener('click', () => switchTab('traffic'));
+btnTabSchema.addEventListener('click', () => switchTab('schema'));
 btnTabFindings.addEventListener('click', () => switchTab('findings'));
+btnTabAttack.addEventListener('click', () => switchTab('attack'));
+
+// Day 6: Clear attack jobs
+btnClearAttacks.addEventListener('click', async () => {
+  await browser.runtime.sendMessage({ type: 'CLEAR_ATTACK_JOBS' });
+  await refresh();
+});
+
+// Day 6: Attack Type Card Click Listeners
+document.querySelectorAll<HTMLButtonElement>('.attack-type-card').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (attackRunning) return;
+    const attackType = btn.dataset.attack as AttackType | undefined;
+    if (!attackType) return;
+
+    const reqId = elAttackTarget.value;
+    if (!reqId) {
+      elAttackTarget.focus();
+      elAttackTarget.style.outline = '2px solid #ef4444';
+      setTimeout(() => { elAttackTarget.style.outline = ''; }, 1200);
+      return;
+    }
+
+    attackRunning = true;
+    elAttackRunningRow.classList.remove('hidden');
+    elAttackRunLabel.textContent = `Running ${attackType.replace(/_/g, ' ')}…`;
+    btn.disabled = true;
+
+    try {
+      await browser.runtime.sendMessage({
+        type: 'RUN_ATTACK',
+        payload: {
+          requestId: reqId,
+          attackType,
+          preserveAuth: elAttackPreserveAuth?.checked ?? false,
+          depthOverride: elAttackDepth?.value ? parseInt(elAttackDepth.value, 10) : undefined,
+        },
+      });
+      await refresh();
+    } catch (err) {
+      console.error('[GraphQL Hunter] Attack failed:', err);
+    } finally {
+      attackRunning = false;
+      elAttackRunningRow.classList.add('hidden');
+      btn.disabled = false;
+    }
+  });
+});
 
 // Global click listener to dismiss auth test dropdowns when clicking outside
 document.addEventListener('click', (e) => {

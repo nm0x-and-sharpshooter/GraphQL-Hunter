@@ -6,7 +6,7 @@
 // Using a discriminated union ensures exhaustive handling in every switch.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { CapturedRequest, HunterStats, GraphQLRequestBody, SchemaModel, AuthTestType, AuthTestResult, Finding } from './graphql';
+import type { CapturedRequest, HunterStats, GraphQLRequestBody, SchemaModel, AuthTestType, AuthTestResult, Finding, AttackType, AttackJob } from './graphql';
 
 // ── Message definitions (discriminated union) ─────────────────────────────────
 
@@ -108,6 +108,43 @@ export interface MsgClearFindings {
   type: 'CLEAR_FINDINGS';
 }
 
+// ── Day 6: Attack Engine messages ───────────────────────────────────────────
+
+/** Popup → background: launch an active attack against a captured request. */
+export interface MsgRunAttack {
+  type:    'RUN_ATTACK';
+  payload: {
+    requestId:    string;
+    attackType:   AttackType;
+    /** If true, send auth headers along with attack payloads. */
+    preserveAuth: boolean;
+    /** Optional depth override for DEPTH_BOMB attacks (default 8). */
+    depthOverride?: number;
+  };
+}
+
+/** Background → popup: completed attack job result (broadcast + direct response). */
+export interface MsgAttackResult {
+  type:    'ATTACK_RESULT';
+  payload: AttackJob;
+}
+
+/** Popup/dashboard → background: fetch all stored attack jobs. */
+export interface MsgGetAttackJobs {
+  type: 'GET_ATTACK_JOBS';
+}
+
+/** Background → popup/dashboard: response to GET_ATTACK_JOBS. */
+export interface MsgAttackJobsResponse {
+  type:    'ATTACK_JOBS_RESPONSE';
+  payload: AttackJob[];
+}
+
+/** Popup/dashboard → background: wipe all stored attack jobs. */
+export interface MsgClearAttackJobs {
+  type: 'CLEAR_ATTACK_JOBS';
+}
+
 // ── Union type ────────────────────────────────────────────────────────────────
 
 export type HunterMessage =
@@ -126,6 +163,11 @@ export type HunterMessage =
   | MsgGetFindings
   | MsgFindingsResponse
   | MsgSaveFindingNote
-  | MsgClearFindings;
+  | MsgClearFindings
+  | MsgRunAttack
+  | MsgAttackResult
+  | MsgGetAttackJobs
+  | MsgAttackJobsResponse
+  | MsgClearAttackJobs;
 
 export type MessageType = HunterMessage['type'];

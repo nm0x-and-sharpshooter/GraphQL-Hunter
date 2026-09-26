@@ -7,9 +7,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import browser from 'webextension-polyfill';
-import { getRequests, clearRequests, getStats, getSchema, clearSchema, saveAuthTestResult, saveFinding, getFindings, updateFindingNote, clearFindings } from './storage';
+import { getRequests, clearRequests, getStats, getSchema, clearSchema, saveAuthTestResult, saveFinding, getFindings, updateFindingNote, clearFindings, saveAttackJob, getAttackJobs, clearAttackJobs } from './storage';
 import { runAuthTest } from '../analysis/auth-tester';
 import { generateCurl } from '../analysis/evidence-utils';
+import { runAttack } from '../analysis/attack-engine';
 import type { HunterMessage, PageHookPayload } from '../types/messages';
 
 export type PageHookHandler = (payload: PageHookPayload, tabId: number) => Promise<void>;
@@ -84,6 +85,28 @@ export function startMessageRouter(): void {
 
         case 'CLEAR_FINDINGS':
           return clearFindings().then(() => ({ ok: true }));
+
+        // ── Day 6: Active Attack Engine ─────────────────────────────────────
+        case 'RUN_ATTACK':
+          return (async () => {
+            const { requestId, attackType, preserveAuth, depthOverride } = message.payload;
+            const allRequests = await getRequests();
+            const target      = allRequests.find(r => r.id === requestId);
+            if (!target) {
+              return { ok: false, error: `Request ${requestId} not found.` };
+            }
+
+            const job = await runAttack(target, attackType, { preserveAuth, depthOverride });
+            await saveAttackJob(job);
+            await broadcast({ type: 'ATTACK_RESULT', payload: job });
+            return job;
+          })();
+
+        case 'GET_ATTACK_JOBS':
+          return getAttackJobs();
+
+        case 'CLEAR_ATTACK_JOBS':
+          return clearAttackJobs().then(() => ({ ok: true }));
 
         default:
           // Not a message we handle — let Firefox know we didn't respond.

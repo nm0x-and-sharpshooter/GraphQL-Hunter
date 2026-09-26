@@ -3,6 +3,7 @@
 // Raw traffic types + Day 2 analysis types + Day 3 schema/complexity types
 // + Day 4 authorization testing + response-comparison types
 // + Day 5 finding/evidence management types
+// + Day 6 active attack engine types
 // all live here to avoid circular module imports.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -253,6 +254,110 @@ export interface FindingsStore {
   lastUpdated: number;
 }
 
+// ── Day 6: Active Attack Engine ───────────────────────────────────────────────
+
+/**
+ * All supported active attack categories.
+ *   INTROSPECTION_PROBE    — Full __schema query (check if introspection is enabled)
+ *   FIELD_SUGGESTION_PROBE — Typo probes to leak field names via error messages
+ *   ALIAS_OVERLOAD         — 100 aliased fields to amplify resolver work (DoS)
+ *   DEPTH_BOMB             — Deeply nested query to trigger recursive resolvers (DoS)
+ *   BATCH_AMPLIFICATION    — 50 identical ops in one JSON array (rate-limit bypass)
+ *   FIELD_FUZZ             — Wordlist spray to discover hidden/undocumented fields
+ *   SENSITIVE_FIELD_PROBE  — Probe for password/token/secret field data exposure
+ */
+export type AttackType =
+  | 'INTROSPECTION_PROBE'
+  | 'FIELD_SUGGESTION_PROBE'
+  | 'ALIAS_OVERLOAD'
+  | 'DEPTH_BOMB'
+  | 'BATCH_AMPLIFICATION'
+  | 'FIELD_FUZZ'
+  | 'SENSITIVE_FIELD_PROBE';
+
+/**
+ * Result of a single dispatched attack payload.
+ *   HIT     — server responded with data (potential vulnerability)
+ *   MISS    — server returned empty data or only errors (protected)
+ *   BLOCKED — server explicitly rejected the attack (depth/complexity limits)
+ *   ERROR   — network or parse error prevented evaluation
+ */
+export type AttackOutcome = 'HIT' | 'MISS' | 'BLOCKED' | 'ERROR';
+
+/** Raw HTTP response captured from a dispatched attack payload. */
+export interface AttackPayloadResponse {
+  status:     number;
+  durationMs: number;
+  /** Parsed JSON body (may be array for batch). */
+  body:       GraphQLResponseBody | GraphQLResponseBody[];
+  /** Raw response text (for display in UI). */
+  raw:        string;
+}
+
+/** Result of dispatching a single attack payload to the endpoint. */
+export interface AttackPayload {
+  id:         string;
+  attackType: AttackType;
+  /** The GraphQL body that was sent. */
+  sentBody:   GraphQLRequestBody | GraphQLRequestBody[];
+  response:   AttackPayloadResponse;
+  outcome:    AttackOutcome;
+  /** Human-readable summary of why the outcome was assigned. */
+  evidence:   string;
+}
+
+/**
+ * A hit produced by the field fuzzer or suggestion probe.
+ *   SUGGESTION_ERROR         — server error message leaked a real field name
+ *   DATA_RETURNED            — field returned non-null data (undocumented field)
+ *   SENSITIVE_FIELD_RETURNED — a known-sensitive field returned a value
+ */
+export type FuzzHitType =
+  | 'SUGGESTION_ERROR'
+  | 'DATA_RETURNED'
+  | 'SENSITIVE_FIELD_RETURNED';
+
+/** A single field discovered or confirmed via fuzzing. */
+export interface FuzzHit {
+  /** Field name that was confirmed. */
+  field:   string;
+  /** Evidence string (error message or value snippet). */
+  evidence: string;
+  hitType:  FuzzHitType;
+}
+
+export type AttackJobStatus = 'RUNNING' | 'SUCCESS' | 'ERROR' | 'PARTIAL';
+
+/**
+ * A complete attack job — wraps all payloads dispatched for one attack type
+ * against one captured request endpoint.
+ */
+export interface AttackJob {
+  id:          string;
+  /** ID of the CapturedRequest this attack was launched from. */
+  requestId:   string;
+  /** Endpoint URL that was attacked. */
+  requestUrl:  string;
+  attackType:  AttackType;
+  startedAt:   number;
+  completedAt: number;
+  status:      AttackJobStatus;
+  /** All individual payloads dispatched during this job. */
+  payloads:    AttackPayload[];
+  /** All fuzz hits discovered (field names, suggestions, sensitive fields). */
+  fuzzHits:    FuzzHit[];
+  /** One-line summary for the UI. */
+  summary:     string;
+  /** Any engine-level errors (network failures, parse errors). */
+  errors:      string[];
+}
+
+/** Top-level storage shape for all attack jobs. */
+export interface AttackJobStore {
+  jobs:        AttackJob[];
+  lastUpdated: number;
+}
+
 // ── Storage helpers ───────────────────────────────────────────────────────────
 
 /** Aggregate stats displayed in the popup and dashboard. */
@@ -267,4 +372,7 @@ export interface HunterStats {
   vulnerableCount:  number;
   inconclusiveCount: number;
   protectedCount:   number;
+  /** Day 6: attack job counts */
+  attackJobCount:   number;
+  attackHitCount:   number;
 }

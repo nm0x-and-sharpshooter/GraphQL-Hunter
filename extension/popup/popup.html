@@ -90,6 +90,15 @@
         Findings
         <span class="tab-badge findings-badge" id="findings-count">0</span>
       </button>
+      <button class="tab-btn tab-btn-attack" id="tab-attack" role="tab"
+              aria-selected="false" aria-controls="panel-attack">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M3 13L8 3l5 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5.5 9.5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Attack
+        <span class="tab-badge attack-badge" id="attack-hit-count">0</span>
+      </button>
     </nav>
 
     <!-- ── Traffic panel ─────────────────────────────────────────────────── -->
@@ -167,6 +176,111 @@
 
       <!-- Findings list (populated by popup.ts) -->
       <div class="findings-list" id="findings-list" aria-label="Authorization test findings"></div>
+    </section>
+
+    <!-- ── Attack panel ──────────────────────────────────────────────────── -->
+    <section class="tab-panel hidden" id="panel-attack" role="tabpanel" aria-labelledby="tab-attack">
+      <div class="feed-header">
+        <span class="feed-title">Attack Engine</span>
+        <button class="btn-ghost" id="btn-clear-attacks" title="Clear all attack results">Clear</button>
+      </div>
+
+      <!-- Target request picker -->
+      <div class="attack-target-row">
+        <label class="attack-label" for="attack-target-select">Target</label>
+        <select class="attack-select" id="attack-target-select">
+          <option value="">-- select a captured request --</option>
+        </select>
+      </div>
+
+      <!-- Attack type grid -->
+      <div class="attack-type-grid" id="attack-type-grid" role="list">
+
+        <button class="attack-type-card" id="atk-INTROSPECTION_PROBE" role="listitem"
+                data-attack="INTROSPECTION_PROBE" title="Send full __schema introspection query">
+          <span class="atk-icon">&#x1F50D;</span>
+          <span class="atk-name">Introspection</span>
+          <span class="atk-desc">Full __schema probe</span>
+          <span class="atk-risk atk-risk-high">HIGH</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-FIELD_SUGGESTION_PROBE" role="listitem"
+                data-attack="FIELD_SUGGESTION_PROBE" title="Typo probes to leak real field names">
+          <span class="atk-icon">&#x1F4AC;</span>
+          <span class="atk-name">Field Suggest</span>
+          <span class="atk-desc">Leak via error messages</span>
+          <span class="atk-risk atk-risk-medium">MED</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-ALIAS_OVERLOAD" role="listitem"
+                data-attack="ALIAS_OVERLOAD" title="100 aliased fields — amplify resolver work">
+          <span class="atk-icon">&#x26A1;</span>
+          <span class="atk-name">Alias Overload</span>
+          <span class="atk-desc">100 aliases, DoS probe</span>
+          <span class="atk-risk atk-risk-high">HIGH</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-DEPTH_BOMB" role="listitem"
+                data-attack="DEPTH_BOMB" title="Deeply nested query to trigger recursive resolvers">
+          <span class="atk-icon">&#x1F4A3;</span>
+          <span class="atk-name">Depth Bomb</span>
+          <span class="atk-desc">Recursive nesting DoS</span>
+          <span class="atk-risk atk-risk-critical">CRIT</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-BATCH_AMPLIFICATION" role="listitem"
+                data-attack="BATCH_AMPLIFICATION" title="50 identical operations in one batch">
+          <span class="atk-icon">&#x1F4E6;</span>
+          <span class="atk-name">Batch Amp</span>
+          <span class="atk-desc">50× batch, rate-limit bypass</span>
+          <span class="atk-risk atk-risk-high">HIGH</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-FIELD_FUZZ" role="listitem"
+                data-attack="FIELD_FUZZ" title="Spray wordlist fields to discover hidden API surface">
+          <span class="atk-icon">&#x1F300;</span>
+          <span class="atk-name">Field Fuzz</span>
+          <span class="atk-desc">Wordlist spray attack</span>
+          <span class="atk-risk atk-risk-medium">MED</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-SENSITIVE_FIELD_PROBE" role="listitem"
+                data-attack="SENSITIVE_FIELD_PROBE" title="Probe for password/token/secret field exposure">
+          <span class="atk-icon">&#x1F512;</span>
+          <span class="atk-name">Sensitive Probe</span>
+          <span class="atk-desc">Password/token exposure</span>
+          <span class="atk-risk atk-risk-critical">CRIT</span>
+        </button>
+
+      </div><!-- /.attack-type-grid -->
+
+      <!-- Options row -->
+      <div class="attack-options-row">
+        <label class="attack-option-check">
+          <input type="checkbox" id="attack-preserve-auth"/>
+          Preserve Auth Headers
+        </label>
+        <label class="attack-option-depth">
+          Depth <input type="number" id="attack-depth-override" value="8" min="3" max="20" class="attack-depth-input"/>
+        </label>
+      </div>
+
+      <!-- Running indicator -->
+      <div class="attack-running-row hidden" id="attack-running-row">
+        <span class="attack-spinner"></span>
+        <span id="attack-running-label">Running attack…</span>
+      </div>
+
+      <!-- Results feed -->
+      <div class="attack-results" id="attack-results">
+        <div class="empty-state" id="attack-empty">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 36L24 12l12 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M17 28h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p>Select a target request and choose<br/>an attack type above to begin.</p>
+        </div>
+      </div>
     </section>
 
     <!-- ── Footer ─────────────────────────────────────────────────────── -->

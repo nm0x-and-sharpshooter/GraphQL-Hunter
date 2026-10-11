@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// attack-engine.ts — Active Attack Payload Generator (Day 6)
+// attack-engine.ts — Active Attack Payload Generator (Day 6 + Day 7)
 //
 // Generates and dispatches active attack payloads against captured GraphQL
 // endpoints. All techniques are passive-first (observe) → active (probe).
 //
-// Attack Categories:
+// Attack Categories (Day 6):
 //   INTROSPECTION_PROBE     — Direct __schema / __type query
 //   FIELD_SUGGESTION_PROBE  — Intentional __typename typo to trigger server
 //                             field-suggestion error messages
@@ -13,6 +13,12 @@
 //   BATCH_AMPLIFICATION     — Sends 50 identical operations in one batch
 //   FIELD_FUZZ              — Sprays wordlist fields against a known root type
 //   SENSITIVE_FIELD_PROBE   — Adds sensitive field names to an existing query
+//
+// Attack Categories (Day 7):
+//   DIRECTIVE_BYPASS        — @skip/@include directive injection for auth bypass
+//   VARIABLE_INJECTION      — SQLi/NoSQLi/SSTI probes via query variables
+//   GET_METHOD_TAMPER       — Test mutation delivery via HTTP GET (CSRF)
+//   CONTENT_TYPE_CSRF       — Test simple Content-Type preflight bypass
 //
 // Each attack type produces one or more AttackPayload objects. The engine
 // dispatches them via fetch() from the background service worker.
@@ -35,6 +41,13 @@ import {
   SCALAR_FIELDS,
   SENSITIVE_FIELDS,
 } from './wordlist';
+
+import {
+  runDirectiveBypass,
+  runVariableInjection,
+  runGetMethodTamper,
+  runContentTypeCsrf,
+} from './injection-scanner';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -563,6 +576,38 @@ export async function runAttack(
         break;
       }
 
+      // ── Day 7: Directive Bypass ──────────────────────────────────────────────
+      case 'DIRECTIVE_BYPASS': {
+        const scanResult = await runDirectiveBypass(url, headers, primary);
+        payloads.push(...scanResult.payloads);
+        fuzzHits.push(...scanResult.fuzzHits);
+        break;
+      }
+
+      // ── Day 7: Variable Injection ────────────────────────────────────────────
+      case 'VARIABLE_INJECTION': {
+        const scanResult = await runVariableInjection(url, headers, primary);
+        payloads.push(...scanResult.payloads);
+        fuzzHits.push(...scanResult.fuzzHits);
+        break;
+      }
+
+      // ── Day 7: GET Method Tamper ─────────────────────────────────────────────
+      case 'GET_METHOD_TAMPER': {
+        const scanResult = await runGetMethodTamper(url, headers, primary);
+        payloads.push(...scanResult.payloads);
+        fuzzHits.push(...scanResult.fuzzHits);
+        break;
+      }
+
+      // ── Day 7: Content-Type CSRF ─────────────────────────────────────────────
+      case 'CONTENT_TYPE_CSRF': {
+        const scanResult = await runContentTypeCsrf(url, headers, primary);
+        payloads.push(...scanResult.payloads);
+        fuzzHits.push(...scanResult.fuzzHits);
+        break;
+      }
+
       default:
         errors.push(`Unknown attack type: ${type}`);
         jobStatus = 'ERROR';
@@ -602,6 +647,10 @@ export function attackTypeLabel(type: AttackType): string {
     case 'BATCH_AMPLIFICATION':    return 'Batch Amplification';
     case 'FIELD_FUZZ':             return 'Field Fuzzing';
     case 'SENSITIVE_FIELD_PROBE':  return 'Sensitive Field Probe';
+    case 'DIRECTIVE_BYPASS':       return 'Directive Bypass';
+    case 'VARIABLE_INJECTION':     return 'Variable Injection';
+    case 'GET_METHOD_TAMPER':      return 'GET Method Tamper (CSRF)';
+    case 'CONTENT_TYPE_CSRF':      return 'Content-Type CSRF';
   }
 }
 
@@ -624,5 +673,13 @@ export function attackTypeDescription(type: AttackType): string {
       return 'Sprays a wordlist of common field names against the endpoint to discover undocumented or hidden fields.';
     case 'SENSITIVE_FIELD_PROBE':
       return 'Appends known-sensitive field names (passwords, tokens, secrets) to probe for data exposure.';
+    case 'DIRECTIVE_BYPASS':
+      return 'Injects @skip(if: false) and @include(if: true) directives to test whether resolver authorization guards can be bypassed via conditional execution directives.';
+    case 'VARIABLE_INJECTION':
+      return 'Fuzzes captured query variables with SQL injection, NoSQL injection, and SSTI probe payloads to detect backend database or template engine leaks.';
+    case 'GET_METHOD_TAMPER':
+      return 'Tests whether the GraphQL endpoint accepts queries (especially mutations) via HTTP GET — a critical CSRF vector since GET requests bypass CORS preflight.';
+    case 'CONTENT_TYPE_CSRF':
+      return 'Tests whether the endpoint accepts simple Content-Types (form-urlencoded, text/plain) that bypass CORS preflight, enabling cross-origin exploitation.';
   }
 }

@@ -258,13 +258,19 @@ export interface FindingsStore {
 
 /**
  * All supported active attack categories.
+ *   Day 6:
  *   INTROSPECTION_PROBE    — Full __schema query (check if introspection is enabled)
  *   FIELD_SUGGESTION_PROBE — Typo probes to leak field names via error messages
  *   ALIAS_OVERLOAD         — 100 aliased fields to amplify resolver work (DoS)
  *   DEPTH_BOMB             — Deeply nested query to trigger recursive resolvers (DoS)
- *   BATCH_AMPLIFICATION    — 50 identical ops in one JSON array (rate-limit bypass)
+ *   BATCH_AMPLIFICATION    — 50 identical ops in one batch request (rate-limit bypass)
  *   FIELD_FUZZ             — Wordlist spray to discover hidden/undocumented fields
  *   SENSITIVE_FIELD_PROBE  — Probe for password/token/secret field data exposure
+ *   Day 7:
+ *   DIRECTIVE_BYPASS       — @skip/@include directive injection to bypass auth guards
+ *   VARIABLE_INJECTION     — SQLi/NoSQLi/SSTI probes via query variables
+ *   GET_METHOD_TAMPER       — Test mutation delivery via HTTP GET (CSRF vector)
+ *   CONTENT_TYPE_CSRF      — Test simple Content-Type bypass (no CORS preflight)
  */
 export type AttackType =
   | 'INTROSPECTION_PROBE'
@@ -273,7 +279,11 @@ export type AttackType =
   | 'DEPTH_BOMB'
   | 'BATCH_AMPLIFICATION'
   | 'FIELD_FUZZ'
-  | 'SENSITIVE_FIELD_PROBE';
+  | 'SENSITIVE_FIELD_PROBE'
+  | 'DIRECTIVE_BYPASS'
+  | 'VARIABLE_INJECTION'
+  | 'GET_METHOD_TAMPER'
+  | 'CONTENT_TYPE_CSRF';
 
 /**
  * Result of a single dispatched attack payload.
@@ -315,7 +325,12 @@ export interface AttackPayload {
 export type FuzzHitType =
   | 'SUGGESTION_ERROR'
   | 'DATA_RETURNED'
-  | 'SENSITIVE_FIELD_RETURNED';
+  | 'SENSITIVE_FIELD_RETURNED'
+  | 'DIRECTIVE_AUTH_BYPASS'
+  | 'INJECTION_ERROR_LEAK'
+  | 'INJECTION_REFLECTION'
+  | 'CSRF_METHOD_ACCEPTED'
+  | 'CSRF_CONTENT_TYPE_ACCEPTED';
 
 /** A single field discovered or confirmed via fuzzing. */
 export interface FuzzHit {

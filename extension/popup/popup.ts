@@ -24,6 +24,18 @@ import type {
   AttackType,
 } from '../types/graphql';
 import type { HunterMessage } from '../types/messages';
+import { exportSchemaAsSDL } from '../analysis/schema-builder';
+
+// ── Utility: blob download ────────────────────────────────────────────────────
+function downloadBlob(content: string, filename: string, mime: string): void {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +65,7 @@ const elSchemaStatFields = document.getElementById('schema-stat-fields')!;
 const elSchemaStatEndpoints = document.getElementById('schema-stat-endpoints')!;
 const elSchemaTypeCount = document.getElementById('schema-type-count')!;
 const btnClearSchema = document.getElementById('btn-clear-schema')!;
+const btnExportSchemaSdl = document.getElementById('btn-export-schema-sdl') as HTMLButtonElement | null;;
 
 // ── Day 4: Findings / Auth Tests DOM refs ─────────────────────────────────────
 const btnTabFindings = document.getElementById('tab-findings')!;
@@ -81,6 +94,7 @@ let currentRequests: CapturedRequest[] = [];
 const pendingTests = new Set<string>();
 let attackJobs: AttackJob[] = [];
 let attackRunning = false;
+let _lastRenderedSchema: SchemaModel | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -378,6 +392,7 @@ function renderSchema(model: SchemaModel): void {
     elSchemaStats.style.display = 'none';
     elSchemaTree.innerHTML = '';
     elSchemaEps.style.display = 'none';
+    if (btnExportSchemaSdl) btnExportSchemaSdl.style.display = 'none';
     return;
   }
 
@@ -387,6 +402,10 @@ function renderSchema(model: SchemaModel): void {
   elSchemaStatTypes.textContent = String(totalTypes);
   elSchemaStatFields.textContent = String(totalFields);
   elSchemaStatEndpoints.textContent = String(model.endpoints.length);
+  if (btnExportSchemaSdl) btnExportSchemaSdl.style.display = '';
+
+  // Store schema for SDL export
+  _lastRenderedSchema = model;
 
   // Type tree
   elSchemaTree.innerHTML = '';
@@ -714,6 +733,16 @@ btnClearAttacks.addEventListener('click', async () => {
   await browser.runtime.sendMessage({ type: 'CLEAR_ATTACK_JOBS' });
   await refresh();
 });
+
+// Day 8: SDL Schema export from popup
+if (btnExportSchemaSdl) {
+  btnExportSchemaSdl.addEventListener('click', () => {
+    if (!_lastRenderedSchema || Object.keys(_lastRenderedSchema.types).length === 0) return;
+    const endpoint = _lastRenderedSchema.endpoints[0];
+    const sdl = exportSchemaAsSDL(_lastRenderedSchema, endpoint);
+    downloadBlob(sdl, `graphql-hunter-schema-${Date.now()}.graphql`, 'text/plain');
+  });
+}
 
 // Day 6: Attack Type Card Click Listeners
 document.querySelectorAll<HTMLButtonElement>('.attack-type-card').forEach(btn => {

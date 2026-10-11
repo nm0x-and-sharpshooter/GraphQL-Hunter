@@ -54,7 +54,7 @@
             <path d="M10 2v3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M6 8v4M6 12l-1.5-1.5M6 12l1.5-1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          Export MD
+          MD Report
         </button>
         <button class="btn-header" id="btn-export-json" title="Export JSON report">
           <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -62,7 +62,29 @@
             <path d="M10 2v3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M5.5 9.5c-.5 0-.5.5-.5 1s0 1 .5 1m5-.5c.5 0 .5-.5.5-1s0-1-.5-1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
           </svg>
-          Export JSON
+          JSON Report
+        </button>
+        <button class="btn-header" id="btn-export-html" title="Export executive HTML audit report">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            <path d="M10 2v3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 9l1.5 1.5L5 12M8 9l1.5 1.5L8 12M11 9v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          HTML Report
+        </button>
+        <button class="btn-header" id="btn-export-postman" title="Export Postman Collection v2.1">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M5 8h6M5 5h3M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Postman
+        </button>
+        <button class="btn-header" id="btn-export-burp" title="Export Burp Suite / Caido raw requests">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M2 3h12M2 7h9M2 11h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M12 10l2 2-2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Burp/Caido
         </button>
         <button class="btn-header danger" id="btn-clear-findings" title="Delete all findings">
           <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -113,6 +135,16 @@
         </svg>
         Schema
         <span class="nav-badge" id="nav-schema-count">0</span>
+      </button>
+
+      <span class="sidebar-section-label">Offensive</span>
+
+      <button class="nav-item" id="nav-attacks" data-section="attacks" aria-selected="false">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M9 1L3 9h5l-1 6 6-8H8l1-6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+        Attacks
+        <span class="nav-badge attack" id="nav-attacks-count">0</span>
       </button>
     </nav>
 
@@ -261,6 +293,14 @@
           <h1 class="section-title">Reconstructed Schema</h1>
           <div class="section-controls">
             <span id="schema-field-summary" style="font-size:11px;color:var(--text-muted)"></span>
+            <button class="btn-header" id="btn-export-sdl" title="Export schema as GraphQL SDL (.graphql)" style="display:none">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                <path d="M10 2v3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 7v5M5.5 9.5L8 12l2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Export SDL
+            </button>
           </div>
         </div>
         <div class="dash-schema-wrap" id="schema-tree-dash">
@@ -272,6 +312,66 @@
             </svg>
             <p>Schema will be reconstructed<br/>as you capture GraphQL traffic</p>
           </div>
+        </div>
+      </section>
+
+      <!-- ── Attacks section (Day 6) ─────────────────────────────────────── -->
+      <section class="section" id="section-attacks" aria-labelledby="nav-attacks">
+        <div class="section-header">
+          <h1 class="section-title">Active Attack Jobs</h1>
+          <div class="section-controls">
+            <span id="attack-stats-summary" style="font-size:11px;color:var(--text-muted)"></span>
+            <button class="btn-header danger" id="btn-clear-attacks" title="Delete all attack jobs">
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M2 4h12M5 4V2h6v2M13 4l-.8 9.2A1 1 0 0111.2 14H4.8a1 1 0 01-1-.8L3 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Clear Jobs
+            </button>
+          </div>
+        </div>
+
+        <!-- Attack stats pills -->
+        <div class="attack-stats-bar" id="attack-stats-bar">
+          <div class="attack-stat-pill">
+            <span class="attack-stat-num" id="astat-total">0</span>
+            <span class="attack-stat-label">Total Jobs</span>
+          </div>
+          <div class="attack-stat-pill hit">
+            <span class="attack-stat-num" id="astat-hits">0</span>
+            <span class="attack-stat-label">Hits</span>
+          </div>
+          <div class="attack-stat-pill success">
+            <span class="attack-stat-num" id="astat-completed">0</span>
+            <span class="attack-stat-label">Completed</span>
+          </div>
+          <div class="attack-stat-pill error">
+            <span class="attack-stat-num" id="astat-errors">0</span>
+            <span class="attack-stat-label">Errors</span>
+          </div>
+        </div>
+
+        <!-- Attack jobs table or empty state -->
+        <div class="attack-table-wrap" id="attack-table-wrap">
+          <div class="empty-state-dash" id="attacks-empty-state">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M26 4L10 26h12l-2 18 16-22H24l2-18z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            </svg>
+            <p>No attack jobs executed yet.<br/>Launch attacks from the popup HUD's <strong>Attack Engine</strong> tab.</p>
+          </div>
+          <table class="attack-table" id="attacks-table" style="display:none">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Attack Type</th>
+                <th>Target</th>
+                <th>Payloads</th>
+                <th>Hits</th>
+                <th>Duration</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="attacks-tbody"></tbody>
+          </table>
         </div>
       </section>
 

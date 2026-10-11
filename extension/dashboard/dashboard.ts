@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// dashboard.ts — Full Dashboard Controller (Day 5)
+// dashboard.ts — Full Dashboard Controller (Day 5 + Day 6 Attack Integration)
 //
 // Responsibilities:
 //   - Load findings, requests, stats, schema from background on open
@@ -11,6 +11,8 @@
 //   - Drawer: show diff table, evidence, curl, analyst note (auto-save on blur)
 //   - Export Markdown and JSON reports via blob download
 //   - Listen for AUTH_TEST_RESULT broadcast to refresh live
+//   - Day 6: Render Attack Jobs section (table, stats, detail drawer)
+//   - Listen for ATTACK_RESULT broadcast to refresh attack jobs live
 //   - Sidebar navigation with active-state management
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -22,69 +24,90 @@ import type {
   Finding,
   AuthVerdict,
   GraphQLRequestBody,
+  AttackJob,
+  AttackPayload,
+  FuzzHit,
 } from '../types/graphql';
 import type { HunterMessage } from '../types/messages';
-import { generateMarkdownReport, generateJsonReport } from '../analysis/evidence-utils';
+import { generateMarkdownReport, generateJsonReport, exportPostmanCollection, exportBurpRawRequests, exportHtmlAuditReport } from '../analysis/evidence-utils';
+import { exportSchemaAsSDL } from '../analysis/schema-builder';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
 // Header stats
-const elHstatTotal  = document.getElementById('hstat-total')!;
-const elHstatVuln   = document.getElementById('hstat-vuln')!;
+const elHstatTotal = document.getElementById('hstat-total')!;
+const elHstatVuln = document.getElementById('hstat-vuln')!;
 const elHstatInconc = document.getElementById('hstat-inconc')!;
-const elHstatSafe   = document.getElementById('hstat-safe')!;
+const elHstatSafe = document.getElementById('hstat-safe')!;
 
 // Overview
-const elOvVuln     = document.getElementById('ov-vuln')!;
-const elOvInconc   = document.getElementById('ov-inconc')!;
-const elOvSafe     = document.getElementById('ov-safe')!;
-const elOvTotal    = document.getElementById('ov-total')!;
+const elOvVuln = document.getElementById('ov-vuln')!;
+const elOvInconc = document.getElementById('ov-inconc')!;
+const elOvSafe = document.getElementById('ov-safe')!;
+const elOvTotal = document.getElementById('ov-total')!;
 const elOvEndpoints = document.getElementById('ov-endpoints')!;
-const elOvEpList   = document.getElementById('ov-endpoint-list')!;
-const elDonutChart  = document.getElementById('donut-chart')!;
-const elDonutVuln  = document.getElementById('donut-label-vuln')!;
+const elOvEpList = document.getElementById('ov-endpoint-list')!;
+const elDonutChart = document.getElementById('donut-chart')!;
+const elDonutVuln = document.getElementById('donut-label-vuln')!;
 const elDonutInconc = document.getElementById('donut-label-inconc')!;
-const elDonutSafe  = document.getElementById('donut-label-safe')!;
+const elDonutSafe = document.getElementById('donut-label-safe')!;
 
 // Findings
 const elFindingsEmpty = document.getElementById('findings-empty-state')!;
 const elFindingsTable = document.getElementById('findings-table')!;
 const elFindingsTbody = document.getElementById('findings-tbody')!;
 const elNavFindingsCount = document.getElementById('nav-findings-count')!;
-const elNavTrafficCount  = document.getElementById('nav-traffic-count')!;
-const elNavSchemaCount   = document.getElementById('nav-schema-count')!;
+const elNavTrafficCount = document.getElementById('nav-traffic-count')!;
+const elNavSchemaCount = document.getElementById('nav-schema-count')!;
+const elNavAttacksCount = document.getElementById('nav-attacks-count')!;
 
 // Traffic
-const elTrafficFeed  = document.getElementById('traffic-feed')!;
+const elTrafficFeed = document.getElementById('traffic-feed')!;
 const elTrafficEmpty = document.getElementById('traffic-empty-state')!;
 
 // Schema
-const elSchemaTreeDash  = document.getElementById('schema-tree-dash')!;
+const elSchemaTreeDash = document.getElementById('schema-tree-dash')!;
 const elSchemaEmptyDash = document.getElementById('schema-empty-state')!;
 const elSchemaFieldSummary = document.getElementById('schema-field-summary')!;
 
 // Drawer
-const elDrawerOverlay   = document.getElementById('drawer-overlay')!;
-const elDrawer          = document.getElementById('detail-drawer')!;
-const elDrawerOpName    = document.getElementById('drawer-op-name')!;
-const elDrawerBadge     = document.getElementById('drawer-verdict-badge')!;
-const elDrawerBody      = document.getElementById('drawer-body')!;
-const btnDrawerClose    = document.getElementById('btn-drawer-close')!;
+const elDrawerOverlay = document.getElementById('drawer-overlay')!;
+const elDrawer = document.getElementById('detail-drawer')!;
+const elDrawerOpName = document.getElementById('drawer-op-name')!;
+const elDrawerBadge = document.getElementById('drawer-verdict-badge')!;
+const elDrawerBody = document.getElementById('drawer-body')!;
+const btnDrawerClose = document.getElementById('btn-drawer-close')!;
 
 // Buttons
-const btnExportMd    = document.getElementById('btn-export-md')!;
-const btnExportJson  = document.getElementById('btn-export-json')!;
+const btnExportMd = document.getElementById('btn-export-md')!;
+const btnExportJson = document.getElementById('btn-export-json')!;
+const btnExportHtml = document.getElementById('btn-export-html')!;
+const btnExportPostman = document.getElementById('btn-export-postman')!;
+const btnExportBurp = document.getElementById('btn-export-burp')!;
+const btnExportSdl = document.getElementById('btn-export-sdl')!;
+
+// Attacks (Day 6)
+const elAttacksEmpty = document.getElementById('attacks-empty-state')!;
+const elAttacksTable = document.getElementById('attacks-table')!;
+const elAttacksTbody = document.getElementById('attacks-tbody')!;
+const elAstatTotal = document.getElementById('astat-total')!;
+const elAstatHits = document.getElementById('astat-hits')!;
+const elAstatCompleted = document.getElementById('astat-completed')!;
+const elAstatErrors = document.getElementById('astat-errors')!;
+const elAttackStatsSummary = document.getElementById('attack-stats-summary')!;
+const btnClearAttacks = document.getElementById('btn-clear-attacks')!;
 const btnClearFindings = document.getElementById('btn-clear-findings')!;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let allFindings:  Finding[]         = [];
-let allRequests:  CapturedRequest[] = [];
+let allFindings: Finding[] = [];
+let allRequests: CapturedRequest[] = [];
+let allAttackJobs: AttackJob[] = [];
 let currentStats: HunterStats | null = null;
 let currentSchema: SchemaModel | null = null;
 
 let activeFilter: 'all' | AuthVerdict = 'all';
-let activeSort:   'severity' | 'recency' = 'severity';
+let activeSort: 'severity' | 'recency' = 'severity';
 let activeSection = 'overview';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -144,9 +167,9 @@ function inferOpType(req: CapturedRequest): string {
 
 function downloadBlob(content: string, filename: string, mime: string): void {
   const blob = new Blob([content], { type: mime });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
@@ -178,27 +201,27 @@ document.querySelectorAll<HTMLButtonElement>('.nav-item').forEach(btn => {
 // ── Overview rendering ────────────────────────────────────────────────────────
 
 function renderOverview(stats: HunterStats, findings: Finding[]): void {
-  const vuln   = stats.vulnerableCount  ?? 0;
+  const vuln = stats.vulnerableCount ?? 0;
   const inconc = stats.inconclusiveCount ?? 0;
-  const safe   = stats.protectedCount   ?? 0;
-  const total  = findings.length;
+  const safe = stats.protectedCount ?? 0;
+  const total = findings.length;
 
   // Header stats
-  elHstatTotal.textContent  = String(stats.totalRequests);
-  elHstatVuln.textContent   = String(vuln);
+  elHstatTotal.textContent = String(stats.totalRequests);
+  elHstatVuln.textContent = String(vuln);
   elHstatInconc.textContent = String(inconc);
-  elHstatSafe.textContent   = String(safe);
+  elHstatSafe.textContent = String(safe);
 
   // Overview cards
-  elOvVuln.textContent      = String(vuln);
-  elOvInconc.textContent    = String(inconc);
-  elOvSafe.textContent      = String(safe);
-  elOvTotal.textContent     = String(stats.totalRequests);
+  elOvVuln.textContent = String(vuln);
+  elOvInconc.textContent = String(inconc);
+  elOvSafe.textContent = String(safe);
+  elOvTotal.textContent = String(stats.totalRequests);
   elOvEndpoints.textContent = String(stats.endpoints.length);
 
   // Nav finding count badge
   elNavFindingsCount.textContent = String(vuln > 0 ? vuln : total);
-  elNavTrafficCount.textContent  = String(stats.totalRequests);
+  elNavTrafficCount.textContent = String(stats.totalRequests);
 
   // Endpoint list
   elOvEpList.innerHTML = '';
@@ -217,7 +240,7 @@ function renderOverview(stats: HunterStats, findings: Finding[]): void {
   if (sum === 0) {
     elDonutChart.style.background = `conic-gradient(var(--border-medium) 0deg 360deg)`;
   } else {
-    const vulnDeg  = (vuln  / sum) * 360;
+    const vulnDeg = (vuln / sum) * 360;
     const inconcDeg = vulnDeg + (inconc / sum) * 360;
     elDonutChart.style.background = `conic-gradient(
       var(--accent-red)    0deg ${vulnDeg.toFixed(1)}deg,
@@ -226,9 +249,9 @@ function renderOverview(stats: HunterStats, findings: Finding[]): void {
     )`;
   }
 
-  elDonutVuln.textContent  = `${vuln} Vulnerable`;
+  elDonutVuln.textContent = `${vuln} Vulnerable`;
   elDonutInconc.textContent = `${inconc} Inconclusive`;
-  elDonutSafe.textContent  = `${safe} Protected`;
+  elDonutSafe.textContent = `${safe} Protected`;
 }
 
 // ── Findings table rendering ──────────────────────────────────────────────────
@@ -260,11 +283,11 @@ function renderFindingsTable(): void {
 
   elFindingsEmpty.style.display = 'none';
   elFindingsTable.style.display = '';
-  elFindingsTbody.innerHTML     = '';
+  elFindingsTbody.innerHTML = '';
 
   for (const finding of filtered) {
     const res = finding.result;
-    const tr  = document.createElement('tr');
+    const tr = document.createElement('tr');
     tr.className = res.verdict;
 
     tr.innerHTML = `
@@ -308,12 +331,12 @@ document.querySelectorAll<HTMLButtonElement>('.filter-btn[data-sort]').forEach(b
 // ── Drawer ────────────────────────────────────────────────────────────────────
 
 function openDrawer(finding: Finding): void {
-  const res  = finding.result;
+  const res = finding.result;
   const verdict = res.verdict;
 
-  elDrawerOpName.textContent   = finding.operationName;
-  elDrawerBadge.textContent    = verdict;
-  elDrawerBadge.className      = `verdict-badge ${verdict}`;
+  elDrawerOpName.textContent = finding.operationName;
+  elDrawerBadge.textContent = verdict;
+  elDrawerBadge.className = `verdict-badge ${verdict}`;
   elDrawer.setAttribute('aria-hidden', 'false');
 
   // Diff entries to show
@@ -335,10 +358,10 @@ function openDrawer(finding: Finding): void {
   const leakedChipsHtml = res.diff.leakedFields.length > 0
     ? `<div class="leaked-chips">
         ${res.diff.leakedFields.slice(0, 10).map(f =>
-          `<span class="leaked-chip">${escapeHtml(f)}</span>`,
-        ).join('')}
+      `<span class="leaked-chip">${escapeHtml(f)}</span>`,
+    ).join('')}
         ${res.diff.leakedFields.length > 10
-          ? `<span class="leaked-chip">+${res.diff.leakedFields.length - 10} more</span>` : ''}
+      ? `<span class="leaked-chip">+${res.diff.leakedFields.length - 10} more</span>` : ''}
       </div>`
     : `<p style="font-size:11px;color:var(--text-muted)">No leaked fields detected.</p>`;
 
@@ -428,7 +451,7 @@ function openDrawer(finding: Finding): void {
     if (note === finding.note) return;
     finding.note = note;
     await browser.runtime.sendMessage({
-      type:    'SAVE_FINDING_NOTE',
+      type: 'SAVE_FINDING_NOTE',
       payload: { findingId: finding.id, note },
     });
     noteSavedHint.classList.add('visible');
@@ -471,17 +494,16 @@ function renderTrafficFeed(requests: CapturedRequest[]): void {
   elTrafficEmpty.style.display = 'none';
 
   for (const req of requests.slice(0, 50)) {
-    const opType  = inferOpType(req);
-    const opName  = inferOpName(req);
-    const risk    = req.analysis?.overallRisk ?? 'INFO';
-    const status  = req.response?.status;
-    const dur     = req.response?.durationMs;
+    const opType = inferOpType(req);
+    const opName = inferOpName(req);
+    const risk = req.analysis?.overallRisk ?? 'INFO';
+    const status = req.response?.status;
+    const dur = req.response?.durationMs;
 
     const item = document.createElement('div');
     item.className = 'dash-feed-item';
     item.innerHTML = `
-      <div class="dash-op-badge ${opType}">${
-        opType === 'mutation' ? 'MUT' : opType === 'sub' ? 'SUB' : 'QRY'
+      <div class="dash-op-badge ${opType}">${opType === 'mutation' ? 'MUT' : opType === 'sub' ? 'SUB' : 'QRY'
       }</div>
       <div class="dash-item-body">
         <div class="dash-item-name">${escapeHtml(opName)}</div>
@@ -498,15 +520,18 @@ function renderTrafficFeed(requests: CapturedRequest[]): void {
 // ── Schema rendering ──────────────────────────────────────────────────────────
 
 function renderSchema(model: SchemaModel): void {
-  const typeNames  = Object.keys(model.types);
+  const typeNames = Object.keys(model.types);
   const totalFields = typeNames.reduce(
     (n, t) => n + Object.keys(model.types[t].fields).length, 0,
   );
 
-  elNavSchemaCount.textContent   = String(typeNames.length);
+  elNavSchemaCount.textContent = String(typeNames.length);
   elSchemaFieldSummary.textContent = typeNames.length > 0
     ? `${typeNames.length} types · ${totalFields} fields · ${model.endpoints.length} endpoints`
     : '';
+
+  // Show/hide SDL export button based on schema availability
+  (btnExportSdl as HTMLButtonElement).style.display = typeNames.length > 0 ? '' : 'none';
 
   // Remove old nodes
   elSchemaTreeDash.querySelectorAll('.schema-node').forEach(n => n.remove());
@@ -533,18 +558,18 @@ function renderSchema(model: SchemaModel): void {
       </div>
       <div class="schema-fields-list" role="list">
         ${fieldNames.sort().map(fn => {
-          const f = schemaType.fields[fn];
-          const argsText = f.args.length > 0 ? `(${f.args.join(', ')})` : '';
-          const opPills  = f.seenInOps
-            .map(op => `<span class="schema-op-pill-dash ${op}">${op === 'subscription' ? 'sub' : op}</span>`)
-            .join('');
-          return `
+      const f = schemaType.fields[fn];
+      const argsText = f.args.length > 0 ? `(${f.args.join(', ')})` : '';
+      const opPills = f.seenInOps
+        .map(op => `<span class="schema-op-pill-dash ${op}">${op === 'subscription' ? 'sub' : op}</span>`)
+        .join('');
+      return `
             <div class="schema-field-row-dash" role="listitem">
               <span class="schema-field-name-dash">${escapeHtml(fn)}</span>
               ${argsText ? `<span class="schema-field-args-dash">${escapeHtml(argsText)}</span>` : ''}
               ${opPills}
             </div>`;
-        }).join('')}
+    }).join('')}
       </div>
     `;
 
@@ -563,19 +588,199 @@ function renderSchema(model: SchemaModel): void {
   }
 }
 
+// ── Day 6: Attack rendering ──────────────────────────────────────────────
+
+const ATTACK_TYPE_LABELS: Record<string, string> = {
+  INTROSPECTION_PROBE: 'Introspection Probe',
+  FIELD_SUGGESTION_PROBE: 'Field Suggestion',
+  ALIAS_OVERLOAD: 'Alias Overload',
+  DEPTH_BOMB: 'Depth Bomb',
+  BATCH_AMPLIFICATION: 'Batch Amplification',
+  FIELD_FUZZ: 'Field Fuzzing',
+  SENSITIVE_FIELD_PROBE: 'Sensitive Field',
+  DIRECTIVE_BYPASS: 'Directive Bypass',
+  VARIABLE_INJECTION: 'Variable Injection',
+  GET_METHOD_TAMPER: 'GET Method Tamper',
+  CONTENT_TYPE_CSRF: 'Content-Type CSRF',
+};
+
+function renderAttackStats(jobs: AttackJob[]): void {
+  const total = jobs.length;
+  const completed = jobs.filter(j => j.status === 'SUCCESS').length;
+  const errors = jobs.filter(j => j.status === 'ERROR').length;
+  const totalHits = jobs.reduce((n, j) => n + j.payloads.filter(p => p.outcome === 'HIT').length, 0);
+
+  elAstatTotal.textContent = String(total);
+  elAstatHits.textContent = String(totalHits);
+  elAstatCompleted.textContent = String(completed);
+  elAstatErrors.textContent = String(errors);
+  elNavAttacksCount.textContent = String(total);
+  elAttackStatsSummary.textContent = total > 0
+    ? `${totalHits} hit${totalHits !== 1 ? 's' : ''} across ${total} job${total !== 1 ? 's' : ''}`
+    : '';
+}
+
+function renderAttackJobs(jobs: AttackJob[]): void {
+  renderAttackStats(jobs);
+
+  if (jobs.length === 0) {
+    elAttacksEmpty.style.display = '';
+    elAttacksTable.style.display = 'none';
+    return;
+  }
+
+  elAttacksEmpty.style.display = 'none';
+  elAttacksTable.style.display = '';
+  elAttacksTbody.innerHTML = '';
+
+  // Sort: most recent first
+  const sorted = [...jobs].sort((a, b) => b.startedAt - a.startedAt);
+
+  for (const job of sorted) {
+    const hitCount = job.payloads.filter(p => p.outcome === 'HIT').length;
+    const duration = job.completedAt - job.startedAt;
+    const typeLabel = ATTACK_TYPE_LABELS[job.attackType] ?? job.attackType;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="attack-status-badge ${job.status}">${job.status}</span></td>
+      <td><span class="attack-type-label">${escapeHtml(typeLabel)}</span></td>
+      <td><span class="attack-url-cell" title="${escapeHtml(job.requestUrl)}">${escapeHtml(fmtUrl(job.requestUrl))}</span></td>
+      <td>${job.payloads.length}</td>
+      <td><span class="attack-hits-cell ${hitCount > 0 ? 'has-hits' : 'no-hits'}">${hitCount}</span></td>
+      <td><span class="attack-duration-cell">${fmtMs(duration)}</span></td>
+      <td><span class="attack-time-cell">${fmtTime(job.startedAt)}</span></td>
+    `;
+
+    tr.addEventListener('click', () => openAttackDrawer(job));
+    elAttacksTbody.appendChild(tr);
+  }
+}
+
+function openAttackDrawer(job: AttackJob): void {
+  const typeLabel = ATTACK_TYPE_LABELS[job.attackType] ?? job.attackType;
+  const hitCount = job.payloads.filter(p => p.outcome === 'HIT').length;
+  const duration = job.completedAt - job.startedAt;
+
+  elDrawerOpName.textContent = typeLabel;
+  elDrawerBadge.textContent = job.status;
+  elDrawerBadge.className = `attack-status-badge ${job.status}`;
+  elDrawer.setAttribute('aria-hidden', 'false');
+
+  // Build payload cards
+  const payloadCardsHtml = job.payloads.map((p: AttackPayload) => {
+    const queryPreview = typeof p.sentBody === 'object' && !Array.isArray(p.sentBody)
+      ? (p.sentBody.query ?? '').slice(0, 200)
+      : '[batch payload]';
+    return `
+      <div class="attack-payload-card">
+        <div class="attack-payload-header">
+          <span class="attack-outcome-badge ${p.outcome}">${p.outcome}</span>
+          <span style="font-size:10px;color:var(--text-muted)">HTTP ${p.response.status} · ${fmtMs(p.response.durationMs)}</span>
+        </div>
+        <div class="attack-payload-evidence">${escapeHtml(p.evidence)}</div>
+        <div class="attack-payload-response">
+          <code style="font-size:10px;color:var(--text-muted);display:block;white-space:pre-wrap;word-break:break-all;max-height:80px;overflow-y:auto">${escapeHtml(queryPreview)}</code>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Build fuzz hits
+  const fuzzHitsHtml = job.fuzzHits.length > 0
+    ? `<div class="fuzz-hit-list">
+        ${job.fuzzHits.map((h: FuzzHit) => {
+      const chipClass = h.hitType === 'SUGGESTION_ERROR'
+        ? 'suggestion'
+        : h.hitType === 'SENSITIVE_FIELD_RETURNED'
+          ? 'sensitive'
+          : (h.hitType === 'INJECTION_ERROR_LEAK' || h.hitType === 'INJECTION_REFLECTION')
+            ? 'injection'
+            : h.hitType === 'DIRECTIVE_AUTH_BYPASS'
+              ? 'directive'
+              : (h.hitType === 'CSRF_METHOD_ACCEPTED' || h.hitType === 'CSRF_CONTENT_TYPE_ACCEPTED')
+                ? 'csrf'
+                : '';
+      return `<span class="fuzz-hit-chip ${chipClass}" title="${escapeHtml(h.evidence)}">${escapeHtml(h.field)}</span>`;
+    }).join('')}
+      </div>`
+    : `<p style="font-size:11px;color:var(--text-muted)">No fuzz hits discovered.</p>`;
+
+  elDrawerBody.innerHTML = `
+    <!-- Meta grid -->
+    <div>
+      <div class="drawer-section-title">Attack Details</div>
+      <div class="drawer-meta-grid">
+        <div class="drawer-meta-item">
+          <div class="drawer-meta-label">Attack Type</div>
+          <div class="drawer-meta-value">${escapeHtml(typeLabel)}</div>
+        </div>
+        <div class="drawer-meta-item">
+          <div class="drawer-meta-label">Status</div>
+          <div class="drawer-meta-value"><span class="attack-status-badge ${job.status}">${job.status}</span></div>
+        </div>
+        <div class="drawer-meta-item">
+          <div class="drawer-meta-label">Duration</div>
+          <div class="drawer-meta-value">${fmtMs(duration)}</div>
+        </div>
+        <div class="drawer-meta-item">
+          <div class="drawer-meta-label">Payloads</div>
+          <div class="drawer-meta-value">${job.payloads.length} (${hitCount} hits)</div>
+        </div>
+        <div class="drawer-meta-item" style="grid-column:span 2">
+          <div class="drawer-meta-label">Target Endpoint</div>
+          <div class="drawer-meta-value" title="${escapeHtml(job.requestUrl)}">${escapeHtml(job.requestUrl)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div>
+      <div class="drawer-section-title">Summary</div>
+      <div class="evidence-box">${escapeHtml(job.summary)}</div>
+    </div>
+
+    <!-- Fuzz Hits -->
+    <div>
+      <div class="drawer-section-title">Discovered Fields / Hits (${job.fuzzHits.length})</div>
+      ${fuzzHitsHtml}
+    </div>
+
+    <!-- Payloads -->
+    <div>
+      <div class="drawer-section-title">Dispatched Payloads (${job.payloads.length})</div>
+      <div class="attack-payload-list">
+        ${payloadCardsHtml}
+      </div>
+    </div>
+
+    ${job.errors.length > 0 ? `
+    <!-- Errors -->
+    <div>
+      <div class="drawer-section-title">Errors</div>
+      <div class="evidence-box" style="border-left-color:var(--accent-red)">${job.errors.map(e => escapeHtml(e)).join('<br/>')}</div>
+    </div>` : ''}
+  `;
+
+  elDrawerOverlay.classList.add('open');
+  elDrawer.classList.add('open');
+  elDrawerOverlay.setAttribute('aria-hidden', 'false');
+}
+
 // ── Data loading ──────────────────────────────────────────────────────────────
 
 async function refresh(): Promise<void> {
-  const [requests, stats, schema, findings] = await Promise.all([
+  const [requests, stats, schema, findings, attackJobs] = await Promise.all([
     browser.runtime.sendMessage({ type: 'GET_CAPTURED_REQUESTS' }) as Promise<CapturedRequest[]>,
-    browser.runtime.sendMessage({ type: 'GET_STATS' })             as Promise<HunterStats>,
-    browser.runtime.sendMessage({ type: 'GET_SCHEMA' })            as Promise<SchemaModel>,
-    browser.runtime.sendMessage({ type: 'GET_FINDINGS' })          as Promise<Finding[]>,
+    browser.runtime.sendMessage({ type: 'GET_STATS' }) as Promise<HunterStats>,
+    browser.runtime.sendMessage({ type: 'GET_SCHEMA' }) as Promise<SchemaModel>,
+    browser.runtime.sendMessage({ type: 'GET_FINDINGS' }) as Promise<Finding[]>,
+    browser.runtime.sendMessage({ type: 'GET_ATTACK_JOBS' }) as Promise<AttackJob[]>,
   ]);
 
-  allRequests   = requests ?? [];
-  allFindings   = findings ?? [];
-  currentStats  = stats;
+  allRequests = requests ?? [];
+  allFindings = findings ?? [];
+  allAttackJobs = attackJobs ?? [];
+  currentStats = stats;
   currentSchema = schema;
 
   const safeStats: HunterStats = stats ?? {
@@ -588,13 +793,14 @@ async function refresh(): Promise<void> {
   renderFindingsTable();
   renderTrafficFeed(allRequests);
   renderSchema(safeSchema);
+  renderAttackJobs(allAttackJobs);
 }
 
 // ── Live updates from background ──────────────────────────────────────────────
 
 browser.runtime.onMessage.addListener((raw: unknown) => {
   const msg = raw as HunterMessage;
-  if (msg.type === 'GRAPHQL_REQUEST_CAPTURED' || msg.type === 'AUTH_TEST_RESULT') {
+  if (msg.type === 'GRAPHQL_REQUEST_CAPTURED' || msg.type === 'AUTH_TEST_RESULT' || msg.type === 'ATTACK_RESULT') {
     refresh();
   }
 });
@@ -613,9 +819,49 @@ btnExportJson.addEventListener('click', () => {
   downloadBlob(json, `graphql-hunter-report-${Date.now()}.json`, 'application/json');
 });
 
+// ── Day 8: New export handlers ────────────────────────────────────────────────
+
+btnExportHtml.addEventListener('click', () => {
+  const html = exportHtmlAuditReport(allFindings, allAttackJobs);
+  downloadBlob(html, `graphql-hunter-audit-${Date.now()}.html`, 'text/html');
+});
+
+btnExportPostman.addEventListener('click', () => {
+  if (allRequests.length === 0) {
+    alert('No captured requests to export. Browse a GraphQL app first.');
+    return;
+  }
+  const endpoint = currentStats?.endpoints[0] ?? 'GraphQL API';
+  const json = exportPostmanCollection(allRequests, `GraphQL Hunter — ${endpoint}`);
+  downloadBlob(json, `graphql-hunter-postman-${Date.now()}.json`, 'application/json');
+});
+
+btnExportBurp.addEventListener('click', () => {
+  if (allRequests.length === 0) {
+    alert('No captured requests to export. Browse a GraphQL app first.');
+    return;
+  }
+  const txt = exportBurpRawRequests(allRequests);
+  downloadBlob(txt, `graphql-hunter-burp-${Date.now()}.txt`, 'text/plain');
+});
+
+btnExportSdl.addEventListener('click', () => {
+  if (!currentSchema || Object.keys(currentSchema.types).length === 0) return;
+  const endpoint = currentSchema.endpoints[0];
+  const sdl = exportSchemaAsSDL(currentSchema, endpoint);
+  downloadBlob(sdl, `graphql-hunter-schema-${Date.now()}.graphql`, 'text/plain');
+});
+
 btnClearFindings.addEventListener('click', async () => {
   if (!window.confirm('Delete all findings? This cannot be undone.')) return;
   await browser.runtime.sendMessage({ type: 'CLEAR_FINDINGS' });
+  closeDrawer();
+  await refresh();
+});
+
+btnClearAttacks.addEventListener('click', async () => {
+  if (!window.confirm('Delete all attack jobs? This cannot be undone.')) return;
+  await browser.runtime.sendMessage({ type: 'CLEAR_ATTACK_JOBS' });
   closeDrawer();
   await refresh();
 });

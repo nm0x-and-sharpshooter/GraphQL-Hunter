@@ -125,7 +125,10 @@
     <section class="tab-panel hidden" id="panel-schema" role="tabpanel" aria-labelledby="tab-schema">
       <div class="feed-header">
         <span class="feed-title">Discovered Schema</span>
-        <button class="btn-ghost" id="btn-clear-schema" title="Clear schema model">Clear</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn-ghost" id="btn-export-schema-sdl" title="Export schema as GraphQL SDL (.graphql)" style="display:none">⬇ SDL</button>
+          <button class="btn-ghost" id="btn-clear-schema" title="Clear schema model">Clear</button>
+        </div>
       </div>
 
       <!-- Schema empty state -->
@@ -250,6 +253,38 @@
           <span class="atk-name">Sensitive Probe</span>
           <span class="atk-desc">Password/token exposure</span>
           <span class="atk-risk atk-risk-critical">CRIT</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-DIRECTIVE_BYPASS" role="listitem"
+                data-attack="DIRECTIVE_BYPASS" title="@skip/@include directive injection to bypass auth guards">
+          <span class="atk-icon">&#x2699;</span>
+          <span class="atk-name">Directive Bypass</span>
+          <span class="atk-desc">@skip/@include bypass</span>
+          <span class="atk-risk atk-risk-high">HIGH</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-VARIABLE_INJECTION" role="listitem"
+                data-attack="VARIABLE_INJECTION" title="SQLi, NoSQLi, and SSTI probes via query variables">
+          <span class="atk-icon">&#x1F489;</span>
+          <span class="atk-name">Variable Inject</span>
+          <span class="atk-desc">SQLi/NoSQLi/SSTI fuzz</span>
+          <span class="atk-risk atk-risk-critical">CRIT</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-GET_METHOD_TAMPER" role="listitem"
+                data-attack="GET_METHOD_TAMPER" title="Test query & mutation execution via HTTP GET">
+          <span class="atk-icon">&#x1F310;</span>
+          <span class="atk-name">GET Tamper</span>
+          <span class="atk-desc">Mutation via GET / CSRF</span>
+          <span class="atk-risk atk-risk-medium">MED</span>
+        </button>
+
+        <button class="attack-type-card" id="atk-CONTENT_TYPE_CSRF" role="listitem"
+                data-attack="CONTENT_TYPE_CSRF" title="Test form-urlencoded & text/plain preflight bypass">
+          <span class="atk-icon">&#x1F6E1;</span>
+          <span class="atk-name">Content-Type CSRF</span>
+          <span class="atk-desc">Preflight bypass</span>
+          <span class="atk-risk atk-risk-high">HIGH</span>
         </button>
 
       </div><!-- /.attack-type-grid -->

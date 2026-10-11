@@ -121,3 +121,104 @@ export const SENSITIVE_FIELDS: readonly string[] = [
   'balance', 'revenue', 'salary',
   'debug', 'internal', 'metadata',
 ];
+
+// ── Day 7: Injection \u0026 Transport Probe Wordlists ─────────────────────────────
+
+/**
+ * Non-destructive SQL injection probe strings.
+ * Designed to trigger syntax errors or boolean-based responses without
+ * modifying data (no DROP, DELETE, UPDATE, INSERT).
+ */
+export const SQLI_PROBES: readonly string[] = [
+  "' OR '1'='1",
+  "1' ORDER BY 1--",
+  "' UNION SELECT NULL--",
+  "admin'--",
+  '" OR ""="',
+  "1; SELECT 1--",
+  "' AND 1=1--",
+  "' AND 1=2--",
+  "1' OR '1'='1' /*",
+  "') OR ('1'='1",
+];
+
+/**
+ * NoSQL injection probes (MongoDB / CouchDB operators).
+ * Sent as variable values — the variable fuzzer JSON-encodes them where applicable.
+ */
+export const NOSQLI_PROBES: readonly string[] = [
+  '{"$gt": ""}',
+  '{"$ne": null}',
+  '{"$regex": ".*"}',
+  '{"$where": "1==1"}',
+  '{"$exists": true}',
+];
+
+/**
+ * Server-Side Template Injection (SSTI) and Expression Language probes.
+ * We look for reflected computation results (e.g. "49" for 7*7).
+ */
+export const SSTI_PROBES: readonly string[] = [
+  '${7*7}',
+  '{{7*7}}',
+  '#{7*7}',
+  '<%= 7*7 %>',
+  '${7*7}',
+  '{{constructor.constructor("return 7*7")()}}',
+];
+
+/** Variable names commonly used as filter/search inputs (injection targets). */
+export const INJECTABLE_VARIABLE_NAMES: readonly string[] = [
+  'id', 'userId', 'accountId', 'email', 'username',
+  'filter', 'where', 'search', 'query', 'q',
+  'sort', 'orderBy', 'limit', 'offset', 'skip',
+  'input', 'data', 'name', 'title', 'slug',
+  'key', 'token', 'code', 'password',
+];
+
+/**
+ * Error message regex patterns indicating backend database or template engine leaks.
+ * Each pattern is compiled to a RegExp by the injection scanner.
+ */
+export const INJECTION_ERROR_PATTERNS: readonly { pattern: string; label: string }[] = [
+  // PostgreSQL
+  { pattern: 'syntax error at or near',         label: 'PostgreSQL syntax error' },
+  { pattern: 'unterminated quoted string',       label: 'PostgreSQL unterminated string' },
+  { pattern: 'invalid input syntax',             label: 'PostgreSQL invalid input' },
+  // MySQL
+  { pattern: 'check the manual that corresponds to your MySQL', label: 'MySQL syntax error' },
+  { pattern: 'You have an error in your SQL syntax',            label: 'MySQL syntax error' },
+  { pattern: 'Unknown column',                                  label: 'MySQL unknown column' },
+  // SQLite
+  { pattern: 'unrecognized token',  label: 'SQLite unrecognized token' },
+  { pattern: 'incomplete input',    label: 'SQLite incomplete input' },
+  { pattern: 'near ".*": syntax error', label: 'SQLite syntax error' },
+  // MongoDB / Mongoose
+  { pattern: 'Cast to ObjectId failed',  label: 'MongoDB ObjectId cast error' },
+  { pattern: 'MongoError',               label: 'MongoDB driver error' },
+  { pattern: 'MongoServerError',         label: 'MongoDB server error' },
+  { pattern: '\\$where is not allowed',  label: 'MongoDB $where blocked' },
+  // Template engines
+  { pattern: 'TemplateSyntaxError',   label: 'Template syntax error' },
+  { pattern: 'UndefinedError',        label: 'Template undefined error' },
+  // Generic
+  { pattern: 'stack trace',    label: 'Stack trace leaked' },
+  { pattern: 'SQLSTATE',       label: 'SQL state error code leaked' },
+  { pattern: 'at \\w+\\.\\w+ \\(', label: 'Stack trace (Node.js / Java)' },
+];
+
+/**
+ * Custom directive names to test for authorization bypass.
+ * These are directives commonly used by auth middleware (e.g. Apollo auth directives).
+ */
+export const AUTH_DIRECTIVE_PROBES: readonly string[] = [
+  '@admin',
+  '@internal',
+  '@auth(role: "ADMIN")',
+  '@auth(role: "admin")',
+  '@authorized',
+  '@requireAuth',
+  '@hasRole(role: "ADMIN")',
+  '@isAuthenticated',
+];
+

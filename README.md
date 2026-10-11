@@ -209,6 +209,21 @@ The compiled, ready-to-load extension will be generated in the `dist/` directory
 
 ---
 
+## 🗺️ Development Roadmap
+
+| Sprint | Feature Area | Status | Deliverables |
+| :--- | :--- | :---: | :--- |
+| **Day 1** | **Network & DOM Interception** | ✅ Complete | Firefox `webRequest.filterResponseData` StreamFilter + DOM `page-hook` monkey-patching. |
+| **Day 2** | **AST Analysis & Risk Engine** | ✅ Complete | Official `graphql` AST parsing (`visit`), variable extraction, heuristic risk scorer. |
+| **Day 3** | **Schema Rebuilding & Complexity** | ✅ Complete | Zero-introspection schema model, recursive depth & list multiplier scoring. |
+| **Day 4** | **Authorization Replay Engine** | ✅ Complete | Replay tests (`NO_AUTH`, `STRIP_COOKIES`, `MUTATE_ID`), response diffing (`VULNERABLE` / `PROTECTED`). |
+| **Day 5** | **Findings & Dashboard v1** | ✅ Complete | Finding persistence, curl generation, Markdown/JSON export, full dashboard UI. |
+| **Day 6** | **Active Attack Engine & UI Integration** | ✅ Complete | 7 attack vectors in `attack-engine.ts`, popup HUD triggers, **full dashboard Attacks tab, live job table, stats bar, and detail drawer**. |
+| **Day 7** | **Advanced Injection & Logic Flaw Scanner** | ✅ Complete | Directive bypass (`@skip`/`@include`), variable fuzzing (SQLi/NoSQLi/SSTI), HTTP method/Content-Type CSRF checks, popup & dashboard UI. |
+| **Day 8** | **Exporters & Toolchain Interoperability** | ✅ Complete | SDL (`.graphql`) zero-introspection schema export, Postman Collection v2.1 (grouped by op type), Burp Suite/Caido raw HTTP repeater export, executive HTML audit report with CVSS scores, diff tables, cURL, and remediation advice. |
+
+---
+
 ## ⚙️ Available Scripts
 
 | Command | Action |
